@@ -25,13 +25,13 @@ function profile(x,totalThickness){const u=Math.max(0,Math.min(1,x));const peak=
 function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();finMesh.material.dispose();}
  const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=48,chordSteps=36,verts=[],indices=[];
  // Two foil surfaces; z is span, x is chord, y is thickness.
- for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,edges=outlineAt(v),leading=edges[0],chord=edges[1]-edges[0];for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.max(.08,1-.78*Math.pow(v,.9));const maxT=th*taper;const f=profile(u,maxT);const y=(side===0?f.top:f.bottom);verts.push(x,y,z);}}}
+ for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,edges=outlineAt(v),leading=edges[0],chord=edges[1]-edges[0];for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.max(.08,1-.78*Math.pow(v,.9));const maxT=th*taper;const f=profile(u,maxT);const foilY=(side===0?f.top:f.bottom);const cantShift=state.finType==="side"?z*Math.tan((state.cant||0)*Math.PI/180):0;const y=foilY+cantShift;verts.push(x,y,z);}}}
  const row=chordSteps+1,layer=(segments+1)*row;
  for(let side=0;side<2;side++){const offset=side*layer;for(let i=0;i<segments;i++)for(let j=0;j<chordSteps;j++){const a=offset+i*row+j,b=a+row,c=b+1,d=a+1;if(side===0)indices.push(a,b,d,b,c,d);else indices.push(a,d,b,b,d,c);}}
  // close leading/trailing edges and root/tip perimeter
  for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
- const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;scene.add(finMesh);finMesh.position.set(-B/2,0,-H/2);controls.target.set(0,0,0); }
+ const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);controls.target.set(0,0,0); }
 function outline(){
  if(importedOutline)return importedOutline.map(([x,y])=>[x*state.height*importedAspect,y*state.height]);
  const pts=[];for(let i=0;i<=40;i++){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12),state.height*v]);}for(let i=40;i>=0;i--){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12)+state.base+(state.tip-state.base)*Math.pow(v,.82),state.height*v]);}return pts;
