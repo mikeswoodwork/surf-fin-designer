@@ -2,6 +2,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 const $=id=>document.getElementById(id);
 const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:38,cant:6,concavity:0},side:{height:125,base:112,tip:48,sweep:34,thickness:9,foilPos:40,cant:6,concavity:0}};
+let importedOutline=null;
 let state={finType:"center",template:"upright",foilType:"symmetric",setup:"thruster",box:"futures",...presets.center};
 const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",8,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
@@ -24,14 +25,46 @@ function profile(x,totalThickness){const u=Math.max(0,Math.min(1,x));const peak=
 function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();finMesh.material.dispose();}
  const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=48,chordSteps=36,verts=[],indices=[];
  // Two foil surfaces; z is span, x is chord, y is thickness.
- for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,rootChord=B,tipChord=T,chord=rootChord+(tipChord-rootChord)*Math.pow(v,.82),leading=S*Math.pow(v,1.12);for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.max(.08,1-.78*Math.pow(v,.9));const maxT=th*taper;const f=profile(u,maxT);const y=(side===0?f.top:f.bottom);verts.push(x,y,z);}}}
+ for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,edges=outlineAt(v),leading=edges[0],chord=edges[1]-edges[0];for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.max(.08,1-.78*Math.pow(v,.9));const maxT=th*taper;const f=profile(u,maxT);const y=(side===0?f.top:f.bottom);verts.push(x,y,z);}}}
  const row=chordSteps+1,layer=(segments+1)*row;
  for(let side=0;side<2;side++){const offset=side*layer;for(let i=0;i<segments;i++)for(let j=0;j<chordSteps;j++){const a=offset+i*row+j,b=a+row,c=b+1,d=a+1;if(side===0)indices.push(a,b,d,b,c,d);else indices.push(a,d,b,b,d,c);}}
  // close leading/trailing edges and root/tip perimeter
  for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;scene.add(finMesh);finMesh.position.set(-B/2,0,-H/2);controls.target.set(0,0,0); }
-function outline(){const pts=[];for(let i=0;i<=40;i++){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12),state.height*v]);}for(let i=40;i>=0;i--){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12)+state.base+(state.tip-state.base)*Math.pow(v,.82),state.height*v]);}return pts;}
+function outline(){
+ if(importedOutline)return importedOutline.map(([x,y])=>[x*state.base,y*state.height]);
+ const pts=[];for(let i=0;i<=40;i++){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12),state.height*v]);}for(let i=40;i>=0;i--){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12)+state.base+(state.tip-state.base)*Math.pow(v,.82),state.height*v]);}return pts;
+}
+function outlineAt(v){
+ if(!importedOutline){const lead=state.sweep*Math.pow(v,1.12),chord=state.base+(state.tip-state.base)*Math.pow(v,.82);return [lead,lead+chord];}
+ const poly=outline(), y=v*state.height, hits=[];
+ for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){const t=(y-a[1])/(b[1]-a[1]);hits.push(a[0]+t*(b[0]-a[0]));}}
+ hits.sort((a,b)=>a-b);return hits.length>=2?[hits[0],hits[hits.length-1]]:[0,state.base];
+}
+async function importOutline(file){
+ const source=await file.text(),doc=new DOMParser().parseFromString(source,"image/svg+xml");
+ if(doc.querySelector("parsererror"))throw new Error("Die SVG-Datei ist fehlerhaft.");
+ const nodes=[...doc.querySelectorAll("path,polygon,polyline")];if(!nodes.length)throw new Error("Keine SVG-Kontur gefunden (path, polygon oder polyline).");
+ let pts=[];
+ for(const node of nodes){
+  if(node.tagName.toLowerCase()==="path"){
+   const len=node.getTotalLength(),n=Math.max(100,Math.min(600,Math.ceil(len/2)));
+   for(let i=0;i<n;i++){const p=node.getPointAtLength(len*i/n);pts.push([p.x,p.y]);}
+  }else{
+   const raw=node.getAttribute("points")||"";pts.push(...raw.trim().split(/[\\s,]+/).reduce((a,v,i,arr)=>{if(i%2===0&&arr[i+1]!==undefined)a.push([Number(v),Number(arr[i+1])]);return a;},[]));
+  }
+ }
+ pts=pts.filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]));
+ if(pts.length<12)throw new Error("Die Kontur enthält zu wenige Punkte.");
+ const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ if(maxX-minX<1e-6||maxY-minY<1e-6)throw new Error("Die Kontur hat keine brauchbare Fläche.");
+ let normalized=pts.map(([x,y])=>[(x-minX)/(maxX-minX),1-(y-minY)/(maxY-minY)]);
+ const area=normalized.reduce((a,p,i)=>{const q=normalized[(i+1)%normalized.length];return a+p[0]*q[1]-q[0]*p[1];},0);
+ if(Math.abs(area)<.01)throw new Error("Die importierte Kontur ist nicht geschlossen oder hat keine Fläche.");
+ importedOutline=normalized;state.template="custom";$("template").value="custom";update();
+ $("outline-status").textContent=file.name+" · "+pts.length+" Stützpunkte · importiert";
+}
 function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}area=Math.abs(area/2);$("read-area").textContent=Math.round(area)+" mm²";$("read-volume").textContent=Math.round(area*state.thickness*.52)+" mm³";}
 function updateFoil(){const pts=[];for(let i=0;i<=80;i++){let x=i/80,p=profile(x,state.thickness);pts.push([15+x*290,55-p.top*5]);}for(let i=80;i>=0;i--){let x=i/80,p=profile(x,state.thickness);pts.push([15+x*290,55-p.bottom*5]);} $("foil-path").setAttribute("d",pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ")+"Z");}
 function update(){[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="foilPos"?" %":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();}
@@ -40,6 +73,8 @@ document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportSTL(){const g=finMesh.geometry;const pos=g.attributes.position,idx=g.index.array;let out="solid FINLAB\n";for(let i=0;i<idx.length;i+=3){const a=new THREE.Vector3().fromBufferAttribute(pos,idx[i]),b=new THREE.Vector3().fromBufferAttribute(pos,idx[i+1]),c=new THREE.Vector3().fromBufferAttribute(pos,idx[i+2]);const n=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();out+=`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`;}out+="endsolid FINLAB";download("finlab-fin.stl",new Blob([out],{type:"model/stl"}));}
 function exportDXF(){const p=outline();const rows=["0","SECTION","2","ENTITIES","0","LWPOLYLINE","8","FIN_OUTLINE","90",String(p.length),"70","1"];p.forEach(([x,y])=>rows.push("10",x.toFixed(3),"20",y.toFixed(3)));rows.push("0","ENDSEC","0","EOF");download("finlab-outline.dxf",new Blob([rows.join("\n")],{type:"application/dxf"}));}
+$("outline-file").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;try{await importOutline(file);}catch(err){$("outline-status").textContent="Import fehlgeschlagen: "+err.message;}});
+$("clear-outline").addEventListener("click",()=>{importedOutline=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
 $("export-stl").addEventListener("click",exportSTL);$("export-dxf").addEventListener("click",exportDXF);$("export-json").addEventListener("click",()=>download("finlab-project.json",new Blob([JSON.stringify(state,null,2)],{type:"application/json"})));
-$("reset").addEventListener("click",()=>{Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
+$("reset").addEventListener("click",()=>{importedOutline=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
 controls();$("foilType").value=state.foilType;init3d();update();
