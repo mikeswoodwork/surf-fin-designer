@@ -38,7 +38,7 @@ function outline(){
 }
 function outlineAt(v){
  if(!importedOutline){const lead=state.sweep*Math.pow(v,1.12),chord=state.base+(state.tip-state.base)*Math.pow(v,.82);return [lead,lead+chord];}
- const poly=outline(), y=v*state.height, hits=[];
+ const poly=outline(), y=(v>=1?state.height-1e-6:v*state.height), hits=[];
  for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){const t=(y-a[1])/(b[1]-a[1]);hits.push(a[0]+t*(b[0]-a[0]));}}
  hits.sort((a,b)=>a-b);return hits.length>=2?[hits[0],hits[hits.length-1]]:[0,state.base];
 }
@@ -52,7 +52,7 @@ async function importOutline(file){
    const len=node.getTotalLength(),n=Math.max(100,Math.min(600,Math.ceil(len/2)));
    for(let i=0;i<n;i++){const p=node.getPointAtLength(len*i/n);pts.push([p.x,p.y]);}
   }else{
-   const raw=node.getAttribute("points")||"";pts.push(...raw.trim().split(/[\\s,]+/).reduce((a,v,i,arr)=>{if(i%2===0&&arr[i+1]!==undefined)a.push([Number(v),Number(arr[i+1])]);return a;},[]));
+   const raw=node.getAttribute("points")||"";pts.push(...raw.trim().split(/[\s,]+/).reduce((a,v,i,arr)=>{if(i%2===0&&arr[i+1]!==undefined)a.push([Number(v),Number(arr[i+1])]);return a;},[]));
   }
  }
  pts=pts.filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]));
