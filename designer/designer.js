@@ -2,7 +2,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 const $=id=>document.getElementById(id);
 const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:38,cant:6,concavity:0},side:{height:125,base:112,tip:48,sweep:34,thickness:9,foilPos:40,cant:6,concavity:0}};
-let importedOutline=null;
+let importedOutline=null,importedAspect=1;
 let state={finType:"center",template:"upright",foilType:"symmetric",setup:"thruster",box:"futures",...presets.center};
 const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",8,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
@@ -12,7 +12,7 @@ function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id
 function templateValues(){if(state.template==="upright"){state.sweep=22;state.tip=42;}if(state.template==="raked"){state.sweep=43;state.tip=36;}if(state.template==="keel"){state.height=90;state.base=155;state.tip=70;state.sweep=62;}syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template="upright";$("template").value="upright";syncInputs();update();});
-$("template").addEventListener("change",e=>{state.template=e.target.value;templateValues();update();});
+$("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;$"outline-status").textContent="Standard-Outline aktiv";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
 $("setup").addEventListener("change",e=>{state.setup=e.target.value;$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
 $("box").addEventListener("change",e=>{state.box=e.target.value;});
@@ -33,7 +33,7 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;scene.add(finMesh);finMesh.position.set(-B/2,0,-H/2);controls.target.set(0,0,0); }
 function outline(){
- if(importedOutline)return importedOutline.map(([x,y])=>[x*state.base,y*state.height]);
+ if(importedOutline)return importedOutline.map(([x,y])=>[x*state.height*importedAspect,y*state.height]);
  const pts=[];for(let i=0;i<=40;i++){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12),state.height*v]);}for(let i=40;i>=0;i--){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12)+state.base+(state.tip-state.base)*Math.pow(v,.82),state.height*v]);}return pts;
 }
 function outlineAt(v){
@@ -62,7 +62,7 @@ async function importOutline(file){
  let normalized=pts.map(([x,y])=>[(x-minX)/(maxX-minX),1-(y-minY)/(maxY-minY)]);
  const area=normalized.reduce((a,p,i)=>{const q=normalized[(i+1)%normalized.length];return a+p[0]*q[1]-q[0]*p[1];},0);
  if(Math.abs(area)<.01)throw new Error("Die importierte Kontur ist nicht geschlossen oder hat keine Fläche.");
- importedOutline=normalized;state.template="custom";$("template").value="custom";update();
+ importedOutline=normalized;importedAspect=(maxX-minX)/(maxY-minY);state.template="custom";$("template").value="custom";update();
  $("outline-status").textContent=file.name+" · "+pts.length+" Stützpunkte · importiert";
 }
 function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}area=Math.abs(area/2);$("read-area").textContent=Math.round(area)+" mm²";$("read-volume").textContent=Math.round(area*state.thickness*.52)+" mm³";}
@@ -74,7 +74,7 @@ function download(name,blob){const a=document.createElement("a"),url=URL.createO
 function exportSTL(){const g=finMesh.geometry;const pos=g.attributes.position,idx=g.index.array;let out="solid FINLAB\n";for(let i=0;i<idx.length;i+=3){const a=new THREE.Vector3().fromBufferAttribute(pos,idx[i]),b=new THREE.Vector3().fromBufferAttribute(pos,idx[i+1]),c=new THREE.Vector3().fromBufferAttribute(pos,idx[i+2]);const n=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();out+=`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`;}out+="endsolid FINLAB";download("finlab-fin.stl",new Blob([out],{type:"model/stl"}));}
 function exportDXF(){const p=outline();const rows=["0","SECTION","2","ENTITIES","0","LWPOLYLINE","8","FIN_OUTLINE","90",String(p.length),"70","1"];p.forEach(([x,y])=>rows.push("10",x.toFixed(3),"20",y.toFixed(3)));rows.push("0","ENDSEC","0","EOF");download("finlab-outline.dxf",new Blob([rows.join("\n")],{type:"application/dxf"}));}
 $("outline-file").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;try{await importOutline(file);}catch(err){$("outline-status").textContent="Import fehlgeschlagen: "+err.message;}});
-$("clear-outline").addEventListener("click",()=>{importedOutline=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
+$("clear-outline").addEventListener("click",()=>{importedOutline=null;importedAspect=1;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
 $("export-stl").addEventListener("click",exportSTL);$("export-dxf").addEventListener("click",exportDXF);$("export-json").addEventListener("click",()=>download("finlab-project.json",new Blob([JSON.stringify(state,null,2)],{type:"application/json"})));
-$("reset").addEventListener("click",()=>{importedOutline=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
+$("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
 controls();$("foilType").value=state.foilType;init3d();update();
