@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b24">
+  <title>Surf Fin Designer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./">FIN<span>LAB</span></a>
+    <span class="version">PROTOTYP · v0.1</span>
+  </header>
+
+  <main class="layout">
+    <section class="intro">
+      <p class="eyebrow">SURF FIN DESIGNER</p>
+      <h1>Deine Finne.<br><em>Dein Shape.</em></h1>
+      <p class="sub">Entwirf und parametriere deine eigene Surfboardfinne. Die Vorschau aktualisiert sich direkt mit deinen Einstellungen.</p>
+    </section>
+
+    <section class="workspace">
+      <div class="preview-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">01 / OUTLINE</p><h2>Seitenansicht</h2></div>
+          <span class="live"><i></i> LIVE</span>
+        </div>
+        <div class="drawing-wrap">
+          <svg id="fin-drawing" viewBox="0 0 440 330" role="img" aria-label="Parametrische Seitenansicht einer Surfboardfinne">
+            <defs>
+              <linearGradient id="finFill" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#e6c9a0"/>
+                <stop offset="1" stop-color="#b47b4b"/>
+              </linearGradient>
+            </defs>
+            <g class="guides">
+              <path d="M38 270 H405" />
+              <path d="M38 70 V270" />
+            </g>
+            <path id="fin-shape" d="" fill="url(#finFill)" stroke="#f4e2c8" stroke-width="2"/>
+            <path id="base-line" d="" stroke="#f4e2c8" stroke-width="3"/>
+            <g class="dimensions" id="dimension-lines"></g>
+            <text x="40" y="295" class="svg-label">BASELINE</text>
+          </svg>
+        </div>
+        <div class="legend"><span><i class="swatch"></i> Finnenkontur</span><span id="outline-summary">130 × 115 mm</span></div>
+      </div>
+
+      <aside class="controls-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">02 / SETUP</p><h2>Grunddaten</h2></div>
+        </div>
+        <label class="field-label" for="setup">Finnen-Setup</label>
+        <select id="setup"><option>Twin</option><option>Thruster</option><option>Single</option><option>Quad</option><option>2 + 1</option></select>
+        <label class="field-label" for="shape">Finnenform</label>
+        <select id="shape"><option value="keel">Classic Keel</option><option value="upright">Upright</option><option value="raked">Raked</option><option value="pivot">Pivot</option></select>
+        <label class="field-label" for="box">Finbox-System</label>
+        <select id="box"><option>Futures</option><option>FCS II</option><option>FCS I</option><option>US Box</option></select>
+
+        <div class="rule"></div>
+        <div class="panel-heading compact"><div><p class="eyebrow">03 / DIMENSIONS</p><h2>Abmessungen</h2></div><span class="unit">MM</span></div>
+        <div class="slider-field">
+          <div><label for="height">Höhe</label><output id="height-out">130 mm</output></div>
+          <input id="height" type="range" min="80" max="180" value="130" step="1">
+        </div>
+        <div class="slider-field">
+          <div><label for="base">Base</label><output id="base-out">115 mm</output></div>
+          <input id="base" type="range" min="70" max="160" value="115" step="1">
+        </div>
+        <div class="slider-field">
+          <div><label for="rake">Rake</label><output id="rake-out">35 mm</output></div>
+          <input id="rake" type="range" min="0" max="70" value="35" step="1">
+        </div>
+        <div class="slider-field">
+          <div><label for="tip">Tip-Chord</label><output id="tip-out">55 mm</output></div>
+          <input id="tip" type="range" min="20" max="90" value="55" step="1">
+        </div>
+        <div class="slider-field">
+          <div><label for="thickness">Max. Dicke</label><output id="thickness-out">10 mm</output></div>
+          <input id="thickness" type="range" min="4" max="16" value="10" step="0.5">
+        </div>
+        <button id="reset" class="reset-button" type="button">↺ Werte zurücksetzen</button>
+      </aside>
+    </section>
+    <footer><span>FINLAB · SURF FIN DESIGNER</span><span>Ein erster parametrischer Entwurf – noch keine CNC-Fertigungsdatei.</span></footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
