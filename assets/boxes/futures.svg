@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 115"><g fill="#d69a62" fill-opacity=".2" stroke="#e8c49e" stroke-width="2"><rect x="44" y="42" width="132" height="30" rx="8"/><circle cx="163" cy="57" r="4"/></g><text x="110" y="101" text-anchor="middle" fill="#9aabb1" font-size="8">SCHEMATISCH</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 115">
+<g fill="none" stroke="#e8c49e" stroke-width="2">
+<!-- Compact Futures-style fin box: short base box, keyed fin slot, rear grub-screw position -->
+<path d="M65 34 H155 Q166 34 166 45 V70 Q166 81 155 81 H65 Q54 81 54 70 V45 Q54 34 65 34Z" fill="#d69a62" fill-opacity=".2"/>
+<path d="M73 43 H147 V72 H73Z" fill="#101b24" stroke="#d69a62"/>
+<path d="M80 48 H140 V67 H80Z" stroke="#e8c49e" stroke-dasharray="3 2"/>
+<circle cx="155" cy="57.5" r="4" fill="#d69a62"/>
+<path d="M155 51 V64 M149 57.5 H161" stroke-width="1"/>
+</g><path d="M45 91 H175" stroke="#53666f" stroke-dasharray="3 4"/><text x="110" y="105" text-anchor="middle" fill="#9aabb1" font-size="8" letter-spacing="1">FUTURES · SCHEMATISCH</text></svg>
