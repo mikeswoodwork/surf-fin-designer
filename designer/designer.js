@@ -3,14 +3,14 @@ import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/exampl
 const $=id=>document.getElementById(id);
 const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:38,cant:6,concavity:0},side:{height:125,base:112,tip:48,sweep:34,thickness:9,foilPos:40,cant:6,concavity:0}};
 let importedOutline=null,importedAspect=1,outlinePoints=null,selectedPoint=null,dragPoint=null;
-const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="side"?"side":"center";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
-let state={finType:initialFin,template:params.get("template")==="keel"?"keel":(params.get("template")|| (initialFin==="side"?"hpsb":"upright")),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
+const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="center"?"center":"side";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
+let state={finType:initialFin,template:params.get("template")|| (initialFin==="side"?"hpsb":"upright"),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
 const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",8,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{state[id]=Number(e.value);update();});});}
-function templateValues(){if(state.template==="upright"){state.sweep=22;state.tip=42;}if(state.template==="hpsb"){state.sweep=34;state.tip=48;}if(state.template==="pivot"){state.sweep=18;state.tip=42;}if(state.template==="raked"){state.sweep=43;state.tip=36;}if(state.template==="keel"){state.height=90;state.base=155;state.tip=70;state.sweep=62;}syncInputs();}
+function templateValues(){if(state.template==="upright"){state.sweep=22;state.tip=42;}if(state.template==="hpsb"){state.height=120;state.base=118;state.tip=16;state.sweep=42;}if(state.template==="pivot"){state.sweep=18;state.tip=42;}if(state.template==="raked"){state.sweep=43;state.tip=36;}if(state.template==="keel"){state.height=90;state.base=155;state.tip=70;state.sweep=62;}syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -50,10 +50,11 @@ function defaultOutline(){
   lead:[[0,0],[1,h*.18],[4,h*.42],[9,h*.68],[16,h*.88],[32.5,h]],
   trail:[[112,0],[105,h*.18],[88,h*.42],[65,h*.68],[49,h*.88],[32.5,h]]
  };
- // HPSB/modern thruster side fin: fuller lower half, pulled-in tip.
+ // Digitized from the user's reference image: rounded, swept thruster side-fin.
+ // Coordinates are scaled to a 120 mm span. Both edges meet at the rounded tip.
  return {
-  lead:[[0,0],[2,h*.18],[7,h*.40],[16,h*.64],[28,h*.84],[42,h]],
-  trail:[[112,0],[106,h*.16],[92,h*.36],[74,h*.58],[56,h*.80],[42,h]]
+  lead:[[0,0],[10,12.5],[14.4,25.6],[22.3,38.7],[31.5,51.8],[42,65],[53.8,78],[67.5,91],[85.2,104],[96.4,111],[112.8,117.4],[131.8,120]],
+  trail:[[118,0],[114.1,12.5],[111.5,25.6],[110.8,38.7],[112.8,51.8],[118,65],[126.6,78],[139.7,91],[155.4,104],[154.8,111],[147.5,117.4],[131.8,120]]
  };
 }
 function edgeX(points,y){
@@ -148,4 +149,4 @@ $("outline-file").addEventListener("change",async e=>{const file=e.target.files[
 $("clear-outline").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
 $("export-stl").addEventListener("click",exportSTL);$("export-svg").addEventListener("click",exportSVG);$("export-dxf").addEventListener("click",exportDXF);$("export-json").addEventListener("click",()=>download("finlab-project.json",new Blob([JSON.stringify(state,null,2)],{type:"application/json"})));
 $("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
-bindOutlineEditor();$("finType").value=state.finType;$("setup").value=state.setup;$("box").value=state.box;$("foilType").value=state.foilType;$("template").value=state.template;if(state.template==="keel")templateValues();buildControls();init3d();update();
+bindOutlineEditor();$("finType").value=state.finType;$("setup").value=state.setup;$("box").value=state.box;$("foilType").value=state.foilType;$("template").value=state.template;if(state.template!=="custom")templateValues();buildControls();init3d();update();
