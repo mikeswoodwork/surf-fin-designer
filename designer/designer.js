@@ -35,44 +35,76 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);controls.target.set(0,0,0); }
 function defaultOutline(){
  const h=state.height;
- if(state.template==="keel")return {lead:[[0,0],[5,h*.22],[22,h*.55],[48,h*.82],[62,h]],trail:[[155,0],[146,h*.2],[126,h*.5],[96,h*.8],[70,h]]};
- if(state.template==="raked")return {lead:[[0,0],[8,h*.25],[22,h*.55],[36,h*.82],[43,h]],trail:[[112,0],[99,h*.25],[78,h*.55],[53,h*.82],[36,h]]};
- if(state.template==="upright")return {lead:[[0,0],[2,h*.25],[7,h*.55],[15,h*.82],[22,h]],trail:[[110,0],[94,h*.25],[74,h*.55],[55,h*.82],[42,h]]};
- return {lead:[[0,0],[4,h*.25],[14,h*.55],[25,h*.82],[34,h]],trail:[[112,0],[98,h*.25],[78,h*.55],[58,h*.82],[48,h]]};
+ // Control stations are in millimetres from the root. Shapes are editable archetypes,
+ // with the characteristic planforms of the selected fin family.
+ if(state.template==="keel")return {
+  lead:[[0,0],[3,h*.16],[12,h*.38],[27,h*.64],[48,h*.84],[68,h]],
+  trail:[[158,0],[157,h*.12],[150,h*.28],[132,h*.48],[103,h*.70],[76,h*.88],[66,h]]
+ };
+ if(state.template==="raked")return {
+  lead:[[0,0],[3,h*.18],[10,h*.40],[21,h*.66],[35,h*.86],[45,h]],
+  trail:[[112,0],[108,h*.18],[98,h*.40],[81,h*.64],[59,h*.84],[43,h]]
+ };
+ if(state.template==="pivot")return {
+  lead:[[0,0],[1,h*.18],[4,h*.42],[9,h*.68],[16,h*.88],[23,h]],
+  trail:[[112,0],[105,h*.18],[88,h*.42],[65,h*.68],[49,h*.88],[42,h]]
+ };
+ // HPSB/modern thruster side fin: fuller lower half, pulled-in tip.
+ return {
+  lead:[[0,0],[2,h*.18],[7,h*.40],[16,h*.64],[28,h*.84],[38,h]],
+  trail:[[112,0],[106,h*.16],[92,h*.36],[74,h*.58],[56,h*.80],[46,h]]
+ };
 }
-function catmull(points,t){
- const n=points.length-1,scaled=Math.max(0,Math.min(.999999,t))*n,i=Math.floor(scaled),f=scaled-i;
- const p0=points[Math.max(0,i-1)],p1=points[i],p2=points[i+1],p3=points[Math.min(n,i+2)];
- const f2=f*f,f3=f2*f;
- return .5*((2*p1[0])+(-p0[0]+p2[0])*f+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*f2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*f3);
+function edgeX(points,y){
+ const n=points.length;if(y<=points[0][1])return points[0][0];if(y>=points[n-1][1])return points[n-1][0];
+ let i=0;while(i<n-2&&points[i+1][1]<y)i++;
+ const p0=points[i],p1=points[i+1],dy=p1[1]-p0[1],t=(y-p0[1])/dy;
+ const slope=(k)=>{if(k===0)return (points[1][0]-points[0][0])/(points[1][1]-points[0][1]);if(k===n-1)return (points[n-1][0]-points[n-2][0])/(points[n-1][1]-points[n-2][1]);return (points[k+1][0]-points[k-1][0])/(points[k+1][1]-points[k-1][1]);};
+ const m0=slope(i)*dy,m1=slope(i+1)*dy,t2=t*t,t3=t2*t;
+ return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
 }
-function edgeX(points,v){return catmull(points,Math.max(0,Math.min(1,v)));}
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
-function outlineAt(v){const p=getOutlinePoints(),lead=edgeX(p.lead,v),trail=edgeX(p.trail,v);return [Math.min(lead,trail),Math.max(lead,trail)];}
-function outline(){const p=[],n=80;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
-function viewTransform(points,width,height,pad=15){
- const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
- const scale=Math.min((width-2*pad)/Math.max(1,maxX-minX),(height-2*pad)/Math.max(1,maxY-minY));
- const ox=(width-(maxX-minX)*scale)/2,oy=(height-(maxY-minY)*scale)/2;
- return {toSvg:([x,y])=>[ox+(x-minX)*scale,height-oy-(y-minY)*scale],toModel:([x,y])=>[(x-ox)/scale+minX,(height-y-oy)/scale+minY]};
+function outlineAt(v){const p=getOutlinePoints(),y=Math.max(0,Math.min(1,v))*state.height;return [edgeX(p.lead,y),edgeX(p.trail,y)];}
+function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const y=state.height*i/n;p.push([edgeX(getOutlinePoints().lead,y),y]);}for(let i=n;i>=0;i--){const y=state.height*i/n;p.push([edgeX(getOutlinePoints().trail,y),y]);}return p;}
+function outlineViewMap(){
+ const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
+ const scale=Math.min(290/Math.max(1,maxX-minX),330/Math.max(1,maxY-minY));
+ const ox=(320-(maxX-minX)*scale)/2,oy=(360-(maxY-minY)*scale)/2;
+ return {scale,minX,minY,ox,oy,toSvg:([x,y])=>[ox+(x-minX)*scale,360-oy-(y-minY)*scale],toModel:([x,y])=>[(x-ox)/scale+minX,(360-y-oy)/scale+minY]};
 }
 function drawOutlineHandles(){
- const svg=$("side-view"),group=$("outline-handles");if(!group)return;
- const p=getOutlinePoints(),all=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))];
- const tx=viewTransform(outline(),320,360,15);
- group.innerHTML=all.map(({edge,i,q})=>{const [x,y]=tx.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?6:4.5)+'"/>';}).join("");
+ const group=$("outline-handles");if(!group)return;const p=getOutlinePoints(),map=outlineViewMap();
+ group.innerHTML=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))].map(({edge,i,q})=>{
+  const [x,y]=map.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;
+  return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?8:7)+'"/>';
+ }).join("");
 }
 function bindOutlineEditor(){
- const svg=$("side-view"),group=$("outline-handles");
- svg.addEventListener("pointerdown",e=>{const handle=e.target.closest(".outline-handle");if(!handle)return;dragPoint={edge:handle.dataset.edge,i:Number(handle.dataset.index)};selectedPoint={...dragPoint};svg.setPointerCapture(e.pointerId);drawOutlineHandles();});
- svg.addEventListener("pointermove",e=>{if(!dragPoint)return;const rect=svg.getBoundingClientRect(),sx=320/rect.width,sy=360/rect.height,tx=viewTransform(outline(),320,360,15),p=tx.toModel([(e.clientX-rect.left)*sx,(e.clientY-rect.top)*sy]);const arr=getOutlinePoints()[dragPoint.edge],i=dragPoint.i;
-  if(i===0||i===arr.length-1)return;
-  const minY=arr[i-1][1]+2,maxY=arr[i+1][1]-2;p[1]=Math.max(minY,Math.min(maxY,p[1]));p[0]=Math.max(0,Math.min(state.base+35,p[0]));arr[i]=p;update();
+ const svg=$("side-view");
+ svg.addEventListener("pointerdown",e=>{const handle=e.target.closest(".outline-handle");if(!handle)return;e.preventDefault();dragPoint={edge:handle.dataset.edge,i:Number(handle.dataset.index),pointerId:e.pointerId};selectedPoint={edge:dragPoint.edge,i:dragPoint.i};svg.setPointerCapture(e.pointerId);drawOutlineHandles();});
+ svg.addEventListener("pointermove",e=>{
+  if(!dragPoint||dragPoint.pointerId!==e.pointerId)return;
+  const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=outlineViewMap(),p=map.toModel([local.x,local.y]);
+  const arr=getOutlinePoints()[dragPoint.edge],i=dragPoint.i;
+  const low=i===0?0:arr[i-1][1]+1,high=i===arr.length-1?state.height:arr[i+1][1]-1;
+  p[1]=Math.max(low,Math.min(high,p[1]));p[0]=Math.max(-15,Math.min(210,p[0]));
+  arr[i]=p;update();
  });
- const finish=()=>{dragPoint=null;};svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);
- $("add-outline-point").addEventListener("click",()=>{const edge=selectedPoint?.edge||"lead",arr=getOutlinePoints()[edge];let i=Math.floor((arr.length-1)/2);const a=arr[i],b=arr[i+1];arr.splice(i+1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);selectedPoint={edge,i:i+1};update();});
- $("delete-outline-point").addEventListener("click",()=>{if(!selectedPoint)return;const arr=getOutlinePoints()[selectedPoint.edge];if(selectedPoint.i===0||selectedPoint.i===arr.length-1)return;arr.splice(selectedPoint.i,1);selectedPoint=null;update();});
- svg.addEventListener("click",e=>{const h=e.target.closest(".outline-handle");if(h){selectedPoint={edge:h.dataset.edge,i:Number(h.dataset.index)};drawOutlineHandles();}});
+ const finish=e=>{if(dragPoint&&dragPoint.pointerId===e.pointerId)dragPoint=null;};
+ svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);svg.addEventListener("lostpointercapture",()=>{dragPoint=null;});
+ function selectHandle(e){const h=e.target.closest(".outline-handle");if(!h)return;selectedPoint={edge:h.dataset.edge,i:Number(h.dataset.index)};drawOutlineHandles();}
+ svg.addEventListener("click",selectHandle);
+ $("add-outline-point").addEventListener("click",()=>{
+  const edge=selectedPoint?.edge||"lead",arr=getOutlinePoints()[edge];
+  let i=selectedPoint?Math.min(selectedPoint.i,arr.length-2):Math.floor((arr.length-2)/2);
+  const a=arr[i],b=arr[i+1],point=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  arr.splice(i+1,0,point);selectedPoint={edge,i:i+1};update();
+ });
+ $("delete-outline-point").addEventListener("click",()=>{
+  if(!selectedPoint)return;const arr=getOutlinePoints()[selectedPoint.edge],i=selectedPoint.i;
+  if(i===0||i===arr.length-1)return;arr.splice(i,1);selectedPoint=null;update();
+ });
 }
 async function importOutline(file){
  const source=await file.text(),doc=new DOMParser().parseFromString(source,"image/svg+xml");
