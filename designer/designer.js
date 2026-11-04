@@ -2,7 +2,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 const $=id=>document.getElementById(id);
 const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:38,cant:6,concavity:0},side:{height:125,base:112,tip:48,sweep:34,thickness:9,foilPos:40,cant:6,concavity:0}};
-let importedOutline=null,importedAspect=1;
+let importedOutline=null,importedAspect=1,outlinePoints=null,selectedPoint=null,dragPoint=null;
 const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="side"?"side":"center";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
 let state={finType:initialFin,template:params.get("template")==="keel"?"keel":"upright",foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
 const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",8,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
@@ -13,7 +13,7 @@ function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id
 function templateValues(){if(state.template==="upright"){state.sweep=22;state.tip=42;}if(state.template==="raked"){state.sweep=43;state.tip=36;}if(state.template==="keel"){state.height=90;state.base=155;state.tip=70;state.sweep=62;}syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template="upright";$("template").value="upright";syncInputs();update();});
-$("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;$("outline-status").textContent="Standard-Outline aktiv";}templateValues();update();});
+$("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
 $("setup").addEventListener("change",e=>{state.setup=e.target.value;$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
 $("box").addEventListener("change",e=>{state.box=e.target.value;});
@@ -33,15 +33,46 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);controls.target.set(0,0,0); }
-function outline(){
- if(importedOutline)return importedOutline.map(([x,y])=>[x*state.height*importedAspect,y*state.height]);
- const pts=[];for(let i=0;i<=40;i++){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12),state.height*v]);}for(let i=40;i>=0;i--){let v=i/40;pts.push([state.sweep*Math.pow(v,1.12)+state.base+(state.tip-state.base)*Math.pow(v,.82),state.height*v]);}return pts;
+function defaultOutline(){
+ const h=state.height;
+ if(state.template==="keel")return {lead:[[0,0],[5,h*.22],[22,h*.55],[48,h*.82],[62,h]],trail:[[155,0],[146,h*.2],[126,h*.5],[96,h*.8],[70,h]]};
+ if(state.template==="raked")return {lead:[[0,0],[8,h*.25],[22,h*.55],[36,h*.82],[43,h]],trail:[[112,0],[99,h*.25],[78,h*.55],[53,h*.82],[36,h]]};
+ if(state.template==="upright")return {lead:[[0,0],[2,h*.25],[7,h*.55],[15,h*.82],[22,h]],trail:[[110,0],[94,h*.25],[74,h*.55],[55,h*.82],[42,h]]};
+ return {lead:[[0,0],[4,h*.25],[14,h*.55],[25,h*.82],[34,h]],trail:[[112,0],[98,h*.25],[78,h*.55],[58,h*.82],[48,h]]};
 }
-function outlineAt(v){
- if(!importedOutline){const lead=state.sweep*Math.pow(v,1.12),chord=state.base+(state.tip-state.base)*Math.pow(v,.82);return [lead,lead+chord];}
- const poly=outline(), y=(v>=1?state.height-1e-6:v*state.height), hits=[];
- for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){const t=(y-a[1])/(b[1]-a[1]);hits.push(a[0]+t*(b[0]-a[0]));}}
- hits.sort((a,b)=>a-b);return hits.length>=2?[hits[0],hits[hits.length-1]]:[0,state.base];
+function catmull(points,t){
+ const n=points.length-1,scaled=Math.max(0,Math.min(.999999,t))*n,i=Math.floor(scaled),f=scaled-i;
+ const p0=points[Math.max(0,i-1)],p1=points[i],p2=points[i+1],p3=points[Math.min(n,i+2)];
+ const f2=f*f,f3=f2*f;
+ return .5*((2*p1[0])+(-p0[0]+p2[0])*f+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*f2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*f3);
+}
+function edgeX(points,v){return catmull(points,Math.max(0,Math.min(1,v)));}
+function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
+function outlineAt(v){const p=getOutlinePoints(),lead=edgeX(p.lead,v),trail=edgeX(p.trail,v);return [Math.min(lead,trail),Math.max(lead,trail)];}
+function outline(){const p=[],n=80;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
+function viewTransform(points,width,height,pad=15){
+ const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ const scale=Math.min((width-2*pad)/Math.max(1,maxX-minX),(height-2*pad)/Math.max(1,maxY-minY));
+ const ox=(width-(maxX-minX)*scale)/2,oy=(height-(maxY-minY)*scale)/2;
+ return {toSvg:([x,y])=>[ox+(x-minX)*scale,height-oy-(y-minY)*scale],toModel:([x,y])=>[(x-ox)/scale+minX,(height-y-oy)/scale+minY]};
+}
+function drawOutlineHandles(){
+ const svg=$("side-view"),group=$("outline-handles");if(!group)return;
+ const p=getOutlinePoints(),all=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))];
+ const tx=viewTransform(outline(),320,360,15);
+ group.innerHTML=all.map(({edge,i,q})=>{const [x,y]=tx.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?6:4.5)+'"/>';}).join("");
+}
+function bindOutlineEditor(){
+ const svg=$("side-view"),group=$("outline-handles");
+ svg.addEventListener("pointerdown",e=>{const handle=e.target.closest(".outline-handle");if(!handle)return;dragPoint={edge:handle.dataset.edge,i:Number(handle.dataset.index)};selectedPoint={...dragPoint};svg.setPointerCapture(e.pointerId);drawOutlineHandles();});
+ svg.addEventListener("pointermove",e=>{if(!dragPoint)return;const rect=svg.getBoundingClientRect(),sx=320/rect.width,sy=360/rect.height,tx=viewTransform(outline(),320,360,15),p=tx.toModel([(e.clientX-rect.left)*sx,(e.clientY-rect.top)*sy]);const arr=getOutlinePoints()[dragPoint.edge],i=dragPoint.i;
+  if(i===0||i===arr.length-1)return;
+  const minY=arr[i-1][1]+2,maxY=arr[i+1][1]-2;p[1]=Math.max(minY,Math.min(maxY,p[1]));p[0]=Math.max(0,Math.min(state.base+35,p[0]));arr[i]=p;update();
+ });
+ const finish=()=>{dragPoint=null;};svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);
+ $("add-outline-point").addEventListener("click",()=>{const edge=selectedPoint?.edge||"lead",arr=getOutlinePoints()[edge];let i=Math.floor((arr.length-1)/2);const a=arr[i],b=arr[i+1];arr.splice(i+1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);selectedPoint={edge,i:i+1};update();});
+ $("delete-outline-point").addEventListener("click",()=>{if(!selectedPoint)return;const arr=getOutlinePoints()[selectedPoint.edge];if(selectedPoint.i===0||selectedPoint.i===arr.length-1)return;arr.splice(selectedPoint.i,1);selectedPoint=null;update();});
+ svg.addEventListener("click",e=>{const h=e.target.closest(".outline-handle");if(h){selectedPoint={edge:h.dataset.edge,i:Number(h.dataset.index)};drawOutlineHandles();}});
 }
 async function importOutline(file){
  const source=await file.text(),doc=new DOMParser().parseFromString(source,"image/svg+xml");
@@ -63,14 +94,14 @@ async function importOutline(file){
  let normalized=pts.map(([x,y])=>[(x-minX)/(maxX-minX),1-(y-minY)/(maxY-minY)]);
  const area=normalized.reduce((a,p,i)=>{const q=normalized[(i+1)%normalized.length];return a+p[0]*q[1]-q[0]*p[1];},0);
  if(Math.abs(area)<.01)throw new Error("Die importierte Kontur ist nicht geschlossen oder hat keine Fläche.");
- importedOutline=normalized;importedAspect=(maxX-minX)/(maxY-minY);state.template="custom";$("template").value="custom";update();
+ importedOutline=normalized;importedAspect=(maxX-minX)/(maxY-minY);outlinePoints=null;state.template="custom";$("template").value="custom";update();
  $("outline-status").textContent=file.name+" · "+pts.length+" Stützpunkte · importiert";
 }
 function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}area=Math.abs(area/2);$("read-area").textContent=Math.round(area)+" mm²";$("read-volume").textContent=Math.round(area*state.thickness*.52)+" mm³";}
 function pathFor(points,width,height,pad=12){const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),sx=(width-2*pad)/Math.max(1,maxX-minX),sy=(height-2*pad)/Math.max(1,maxY-minY),scale=Math.min(sx,sy),ox=(width-(maxX-minX)*scale)/2,oy=(height-(maxY-minY)*scale)/2;return points.map((p,i)=>(i?"L":"M")+(ox+(p[0]-minX)*scale).toFixed(2)+","+(height-oy-(p[1]-minY)*scale).toFixed(2)).join(" ")+" Z";}
-function updateTechnicalViews(){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));const top=[];for(let i=0;i<=60;i++){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.top]);}for(let i=60;i>=0;i--){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.bottom]);}$("top-view-path").setAttribute("d",pathFor(top,320,170,14));const front=[];for(let i=0;i<=48;i++){const v=i/48,z=state.height*v,t=state.thickness*Math.max(.08,1-.78*Math.pow(v,.9)),f=profile(.38,t);front.push([z,f.top]);}for(let i=48;i>=0;i--){const v=i/48,z=state.height*v,t=state.thickness*Math.max(.08,1-.78*Math.pow(v,.9)),f=profile(.38,t);front.push([z,f.bottom]);}$("front-view-path").setAttribute("d",pathFor(front,320,170,14));}
+function updateTechnicalViews(){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));drawOutlineHandles();const top=[];for(let i=0;i<=60;i++){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.top]);}for(let i=60;i>=0;i--){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.bottom]);}$("top-view-path").setAttribute("d",pathFor(top,320,170,14));const front=[];for(let i=0;i<=48;i++){const v=i/48,z=state.height*v,t=state.thickness*Math.max(.08,1-.78*Math.pow(v,.9)),f=profile(.38,t);front.push([z,f.top]);}for(let i=48;i>=0;i--){const v=i/48,z=state.height*v,t=state.thickness*Math.max(.08,1-.78*Math.pow(v,.9)),f=profile(.38,t);front.push([z,f.bottom]);}$("front-view-path").setAttribute("d",pathFor(front,320,170,14));}
 function updateFoil(){const pts=[];for(let i=0;i<=80;i++){let x=i/80,p=profile(x,state.thickness);pts.push([15+x*290,55-p.top*5]);}for(let i=80;i>=0;i--){let x=i/80,p=profile(x,state.thickness);pts.push([15+x*290,55-p.bottom*5]);} $("foil-path").setAttribute("d",pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ")+"Z");}
-function update(){[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="foilPos"?" %":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();updateTechnicalViews();}
+function update(){[...definitions,...definitions].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="foilPos"?" %":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();updateTechnicalViews();}
 function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===mode));if(mode==="3d"){camera.position.set(220,170,260);controls.enableRotate=true;}else if(mode==="side"){camera.position.set(0,0,420);controls.enableRotate=false;}else{camera.position.set(420,0,0);controls.enableRotate=false;}controls.target.set(0,0,0);controls.update();}
 document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -78,7 +109,7 @@ function exportSTL(){finMesh.updateMatrixWorld(true);const g=finMesh.geometry;co
 function exportSVG(){const p=outline(),xs=p.map(q=>q[0]),ys=p.map(q=>q[1]),minX=Math.min(...xs),minY=Math.min(...ys),w=Math.max(...xs)-minX,h=Math.max(...ys)-minY;const d=p.map((q,i)=>(i?"L":"M")+(q[0]-minX).toFixed(3)+","+(h-(q[1]-minY)).toFixed(3)).join(" ")+" Z";const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(2)}mm" height="${h.toFixed(2)}mm" viewBox="0 0 ${w.toFixed(3)} ${h.toFixed(3)}"><path d="${d}" fill="none" stroke="black" stroke-width="0.5"/></svg>`;download("finlab-outline.svg",new Blob([svg],{type:"image/svg+xml"}));}
 function exportDXF(){const p=outline();const rows=["0","SECTION","2","ENTITIES","0","LWPOLYLINE","8","FIN_OUTLINE","90",String(p.length),"70","1"];p.forEach(([x,y])=>rows.push("10",x.toFixed(3),"20",y.toFixed(3)));rows.push("0","ENDSEC","0","EOF");download("finlab-outline.dxf",new Blob([rows.join("\n")],{type:"application/dxf"}));}
 $("outline-file").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;try{await importOutline(file);}catch(err){$("outline-status").textContent="Import fehlgeschlagen: "+err.message;}});
-$("clear-outline").addEventListener("click",()=>{importedOutline=null;importedAspect=1;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
+$("clear-outline").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
 $("export-stl").addEventListener("click",exportSTL);$("export-svg").addEventListener("click",exportSVG);$("export-dxf").addEventListener("click",exportDXF);$("export-json").addEventListener("click",()=>download("finlab-project.json",new Blob([JSON.stringify(state,null,2)],{type:"application/json"})));
-$("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
-$("finType").value=state.finType;$("setup").value=state.setup;$("box").value=state.box;$("foilType").value=state.foilType;$("template").value=state.template;if(state.template==="keel")templateValues();buildControls();init3d();update();
+$("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
+bindOutlineEditor();$("finType").value=state.finType;$("setup").value=state.setup;$("box").value=state.box;$("foilType").value=state.foilType;$("template").value=state.template;if(state.template==="keel")templateValues();buildControls();init3d();update();
