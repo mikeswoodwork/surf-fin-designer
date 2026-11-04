@@ -38,21 +38,22 @@ function defaultOutline(){
  // Control stations are in millimetres from the root. Shapes are editable archetypes,
  // with the characteristic planforms of the selected fin family.
  if(state.template==="keel")return {
-  lead:[[0,0],[3,h*.16],[12,h*.38],[27,h*.64],[48,h*.84],[68,h]],
-  trail:[[158,0],[157,h*.12],[150,h*.28],[132,h*.48],[103,h*.70],[76,h*.88],[66,h]]
+  // Both edges converge at one tip point: no flat closing edge.
+  lead:[[0,0],[3,h*.16],[12,h*.38],[27,h*.64],[48,h*.84],[67,h]],
+  trail:[[158,0],[157,h*.12],[150,h*.28],[132,h*.48],[103,h*.70],[76,h*.88],[67,h]]
  };
  if(state.template==="raked")return {
-  lead:[[0,0],[3,h*.18],[10,h*.40],[21,h*.66],[35,h*.86],[45,h]],
-  trail:[[112,0],[108,h*.18],[98,h*.40],[81,h*.64],[59,h*.84],[43,h]]
+  lead:[[0,0],[3,h*.18],[10,h*.40],[21,h*.66],[35,h*.86],[44,h]],
+  trail:[[112,0],[108,h*.18],[98,h*.40],[81,h*.64],[59,h*.84],[44,h]]
  };
  if(state.template==="pivot")return {
-  lead:[[0,0],[1,h*.18],[4,h*.42],[9,h*.68],[16,h*.88],[23,h]],
-  trail:[[112,0],[105,h*.18],[88,h*.42],[65,h*.68],[49,h*.88],[42,h]]
+  lead:[[0,0],[1,h*.18],[4,h*.42],[9,h*.68],[16,h*.88],[32.5,h]],
+  trail:[[112,0],[105,h*.18],[88,h*.42],[65,h*.68],[49,h*.88],[32.5,h]]
  };
  // HPSB/modern thruster side fin: fuller lower half, pulled-in tip.
  return {
-  lead:[[0,0],[2,h*.18],[7,h*.40],[16,h*.64],[28,h*.84],[38,h]],
-  trail:[[112,0],[106,h*.16],[92,h*.36],[74,h*.58],[56,h*.80],[46,h]]
+  lead:[[0,0],[2,h*.18],[7,h*.40],[16,h*.64],[28,h*.84],[42,h]],
+  trail:[[112,0],[106,h*.16],[92,h*.36],[74,h*.58],[56,h*.80],[42,h]]
  };
 }
 function edgeX(points,y){
