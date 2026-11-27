@@ -72,15 +72,13 @@ function makeFootprintMesh(shape,thickness,xOffset,depthOffset=0,zOffset=0,bevel
  m.position.set(xOffset,0,zOffset);return m;
 }
 function makeFuturesFootprint(){
- // Single continuous Futures tongue. Dimensions are a working generic
- // fin-base envelope, not a certified manufacturer tolerance drawing.
+ // Generic full-length single Futures-style tongue. The envelope is a working
+ // model, not a manufacturer tolerance drawing or a verified locking profile.
  const L=113.5,D=17.7,r=2.2,s=new THREE.Shape();
- // Rounded nose at the forward end; rear end carries the open retaining relief.
- s.moveTo(r,0);s.lineTo(L-5,0);s.quadraticCurveTo(L,0,L,D/2-2.2);
- s.lineTo(L,D/2+2.2);s.quadraticCurveTo(L,D,L-5,D);
- s.lineTo(r,D);s.quadraticCurveTo(0,D,D/2+r,D);
- s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,-Math.PI/2,true);
- s.lineTo(0,D/2-r);s.quadraticCurveTo(0,0,r,0);s.closePath();
+ s.moveTo(r,0);s.lineTo(L-5,0);s.quadraticCurveTo(L,0,L,D/2);
+ s.quadraticCurveTo(L,D,L-5,D);s.lineTo(r,D);
+ s.quadraticCurveTo(0,D,r,D-r);s.lineTo(r,r);
+ s.quadraticCurveTo(0,0,r,0);s.closePath();
  return s;
 }
 function makeFuturesBase(xOffset){
