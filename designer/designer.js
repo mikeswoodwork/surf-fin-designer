@@ -69,29 +69,35 @@ function makeFootprintMesh(shape,height,xOffset,yOffset=0,zOffset=0,bevel=.15){
  m.position.set(xOffset,yOffset,zOffset);return m;
 }
 function makeFuturesFootprint(){
- // Side-Fin/Quad-front reference drawing: 113.5 mm base, 17.7 mm width.
- // The forward end has the measured 4.4 mm round-ended retaining slot;
- // rear end uses the 10°/6° bevel envelope shown in the drawing.
- const L=113.5,W=17.7,s=new THREE.Shape();
- s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L,3.8);s.lineTo(L, W-5.5);
- s.lineTo(L-3.8,W);s.lineTo(0,W);s.lineTo(0,W*.5+2.2);
- s.lineTo(3.3,W*.5+2.2);s.absarc(3.3,W*.5,2.2,Math.PI/2,-Math.PI/2,true);
- s.lineTo(0,W*.5-2.2);s.closePath();
+ // Plan contour from the supplied Side Fin / Quad Front drawing.
+ // Leading end is plain; the Ø4.4 retaining relief is placed at the rear,
+ // as requested. Overall chord = 113.5 mm, across-fin width = 7.7 mm.
+ const L=113.5,W=7.7,s=new THREE.Shape(),r=2.2;
+ s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L-3.8,0.8);
+ s.lineTo(L,2.1);s.lineTo(L,W-2.1);s.lineTo(L-3.8,W-0.8);
+ s.lineTo(L-10.5,W);s.lineTo(0,W);
+ // Rear-open rounded screw engagement notch: Ø4.4, centre 3.3 mm from rear.
+ s.lineTo(L-3.3,W/2+r);
+ s.absarc(L-3.3,W/2,r,Math.PI/2,-Math.PI/2,true);
+ s.lineTo(L-3.3,W/2-r);s.lineTo(0,0);s.closePath();
  return s;
 }
 function makeFuturesBase(xOffset){
  const group=new THREE.Group();
- // 17.7 mm plan width, 113.5 mm length. 7.7 mm root land based on drawing.
- const base=makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,-Wf/2,0,.12);
+ const base=makeFootprintMesh(makeFuturesFootprint(),17.7,xOffset,-Wf/2,0,.12);
  group.add(base);
- // Shallow tapered shoulder at rear end, represented as a separate wedge.
- const wedgeShape=new THREE.Shape();wedgeShape.moveTo(0,0);wedgeShape.lineTo(10.5,0);wedgeShape.lineTo(10.5,2.1);wedgeShape.lineTo(0,0);wedgeShape.closePath();
- const wedgeGeo=new THREE.ExtrudeGeometry(wedgeShape,{depth:Wf,bevelEnabled:false,steps:1});
- wedgeGeo.translate(0,0,-Wf/2);
- const wedge=new THREE.Mesh(wedgeGeo,new THREE.MeshStandardMaterial({color:0x87979d,roughness:.32}));
- wedge.position.set(xOffset+103,-3.85,0);group.add(wedge);
+ // Futures grub-screw engagement land: a raised, tapered boss at the rear.
+ // The rear-open Ø4.4 relief remains accessible from the end.
+ const bossShape=new THREE.Shape();
+ bossShape.moveTo(0,0);bossShape.lineTo(8.5,0);bossShape.lineTo(8.5,1.2);
+ bossShape.quadraticCurveTo(5.5,2.4,0,1.2);bossShape.closePath();
+ const bossGeo=new THREE.ExtrudeGeometry(bossShape,{depth:Wf+1.0,bevelEnabled:true,bevelSegments:2,bevelSize:.2,bevelThickness:.15,steps:1});
+ bossGeo.translate(0,0,-(Wf+1.0)/2);
+ const boss=new THREE.Mesh(bossGeo,new THREE.MeshStandardMaterial({color:0x87979d,roughness:.3,metalness:.12}));
+ boss.position.set(xOffset+Lfuture-8.5,-17.7,0);group.add(boss);
  return group;
 }
+const Lfuture=113.5;
 const Wf=17.7;
 function makeFcsTab(xOffset,tabCenter){
  // FCS G5/G7 drawing specifies 34 mm tab distance. Two independent plug tabs.
@@ -104,7 +110,7 @@ function makeFcsTab(xOffset,tabCenter){
 function makeUsBoxBase(xOffset){
  // Supplied US-box drawing: 175 overall length, 9.2 mm top-view width,
  // 24 mm front-view height envelope, 16.4 mm section depth and 60° internal ramp.
- const L=175,W=9.2,H=16.4,s=new THREE.Shape();
+ const L=96.5,W=9.2,H=16.4,s=new THREE.Shape();
  // Side elevation in (length, vertical) coordinates. End shoulders and central
  // recessed run are traced from the front/section views rather than a capsule.
  s.moveTo(0,0);s.lineTo(13,0);s.lineTo(22,0);s.lineTo(31,0);
@@ -114,8 +120,7 @@ function makeUsBoxBase(xOffset){
  s.lineTo(170,-8.2);s.lineTo(164,-16.4);s.lineTo(11,-16.4);
  s.lineTo(5,-8.2);s.lineTo(0,-4.5);s.closePath();
  const g=new THREE.ExtrudeGeometry(s,{depth:W,bevelEnabled:false,steps:1,curveSegments:16});
- g.rotateX(Math.PI/2);
- g.translate(0,W/2,0);
+ g.translate(0,0,-W/2);
  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
  mesh.position.set(xOffset,0,0);return mesh;
 }
