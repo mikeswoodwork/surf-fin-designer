@@ -4,18 +4,18 @@ const $=id=>document.getElementById(id);
 const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:38,cant:6,concavity:0},side:{height:125,base:112,tip:48,sweep:34,thickness:9,foilPos:40,cant:6,concavity:0}};
 let importedOutline=null,importedAspect=1,outlinePoints=null,selectedPoint=null,dragPoint=null;
 const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="center"?"center":"side";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
-let state={finType:initialFin,template:params.get("template")|| (initialFin==="side"?"hpsb":"upright"),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
+let state={finType:initialFin,template:params.get("template")|| (initialSetup==="single"?"fin7":initialSetup==="twin"?"fin25":"fin37"),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
 const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",8,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},hpsb:{height:120,base:118,tip:16,sweep:42},raked:{height:115,base:112,tip:36,sweep:43},pivot:{height:150,base:135,tip:40,sweep:24},single:{height:165,base:135,tip:28,sweep:20},quad:{height:95,base:100,tip:24,sweep:48},keel:{height:85,base:160,tip:70,sweep:58}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:120,base:118,tip:16,sweep:42},fin25:{height:85,base:160,tip:70,sweep:58},fin7:{height:115,base:112,tip:36,sweep:43},fin15:{height:150,base:135,tip:40,sweep:24}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
-$("setup").addEventListener("change",e=>{state.setup=e.target.value;$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
+$("setup").addEventListener("change",e=>{state.setup=e.target.value;const next=state.setup==="single"?"fin7":state.setup==="twin"?"fin25":"fin37";state.template=next;$("template").value=next;outlinePoints=null;selectedPoint=null;templateValues();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
 $("box").addEventListener("change",e=>{state.box=e.target.value;});
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab,.tab-panel").forEach(n=>n.classList.remove("active"));b.classList.add("active");$("panel-"+b.dataset.tab).classList.add("active");}));
 let scene,camera,renderer,controls,finMesh,grid,viewMode="3d";
@@ -37,26 +37,26 @@ function defaultOutline(){
  const h=state.height;
  // Control stations are in millimetres from the root. Shapes are editable archetypes,
  // with the characteristic planforms of the selected fin family.
- if(state.template==="keel")return {
+ if(state.template==="fin25")return {
   // Broad fish keel: long base, fuller trailing edge and rounded swept tip.
   lead:[[0,0],[8,h*.24],[23,h*.52],[45,h*.82],[67,h]],
   trail:[[160,0],[157,h*.24],[145,h*.52],[111,h*.82],[67,h]]
  };
- if(state.template==="quad")return {
+ if(state.template==="__unused_quad")return {
   // Compact rear quad fin: short span, narrow base and strongly swept tip.
   lead:[[0,0],[8,h*.25],[22,h*.52],[43,h*.82],[61,h]],
   trail:[[100,0],[94,h*.25],[80,h*.52],[65,h*.82],[61,h]]
  };
- if(state.template==="single")return {
+ if(state.template==="__unused_single")return {
   // Upright singlefin: deep base, moderate rake and a narrow rounded tip.
   lead:[[0,0],[5,h*.25],[13,h*.52],[27,h*.82],[39,h]],
   trail:[[135,0],[130,h*.25],[113,h*.52],[76,h*.82],[39,h]]
  };
- if(state.template==="raked")return {
+ if(state.template==="fin7")return {
   lead:[[0,0],[3,h*.18],[10,h*.40],[21,h*.66],[35,h*.86],[44,h]],
   trail:[[112,0],[108,h*.18],[98,h*.40],[81,h*.64],[59,h*.84],[44,h]]
  };
- if(state.template==="pivot")return {
+ if(state.template==="fin15")return {
   lead:[[0,0],[1,h*.18],[4,h*.42],[9,h*.68],[16,h*.88],[32.5,h]],
   trail:[[112,0],[105,h*.18],[88,h*.42],[65,h*.68],[49,h*.88],[32.5,h]]
  };
