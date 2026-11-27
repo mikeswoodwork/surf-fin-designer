@@ -75,7 +75,7 @@ function makeFuturesFootprint(){
  // rear-open Ø4.4 notch at x=0; 3.3 mm centre setback from rear.
  s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L-3.8,.8);s.lineTo(L,2.1);
  s.lineTo(L,D-2.1);s.lineTo(L-3.8,D-.8);s.lineTo(L-10.5,D);s.lineTo(0,D);
- s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,Math.PI*1.5,false);s.lineTo(0,D/2-r);s.closePath();return s;
+ s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,-Math.PI/2,true);s.lineTo(0,D/2-r);s.closePath();return s;
 }
 function makeFuturesBase(xOffset){
  const g=new THREE.Group(),D=17.7;
@@ -109,8 +109,8 @@ function updateFinBase(){
  const rp=profile(.5,frontThicknessAt(0));
  finBaseGroup.position.add(new THREE.Vector3(0,-(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
  if(state.box==="futures"){
-  const L=113.5,usable=Math.min(L,rootLength),center=rootStart+usable/2+(rootLength-usable)*position;
-  finBaseGroup.add(makeFuturesBase(center-usable/2));
+  const L=113.5,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-L);
+  finBaseGroup.add(makeFuturesBase(center-L/2));
  }else if(state.box==="fcs1"){
   const tabL=19,spacing=34,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-spacing-tabL);
   finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
