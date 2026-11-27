@@ -53,64 +53,56 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;// Local z is the fin span; after rotation it becomes world y.
  finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,-(bounds.min.z+bounds.max.z)/2,0);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
 
-function bezierBaseShape(length,drop,topInset=0,hole=false){
- const s=new THREE.Shape(),rootOverlap=1.2;
- // The top land overlaps the fin root by 1.2 mm, avoiding a merely tangent contact.
- s.moveTo(topInset,rootOverlap);
- s.bezierCurveTo(topInset+2,rootOverlap-drop*.08,topInset+2,-drop*.82,topInset+5,-drop);
- s.bezierCurveTo(length*.28,-drop*1.04,length*.72,-drop*1.04,length-5,-drop);
- s.bezierCurveTo(length-2,-drop*.82,length-2,rootOverlap-drop*.08,length-topInset,rootOverlap);
- s.lineTo(topInset,rootOverlap);
- if(hole){
-  const cut=new THREE.Path();
-  cut.absellipse(length/2,-drop*.52,2.25,2.25,0,Math.PI*2,true,0);
-  s.holes.push(cut);
- }
+function bezierBaseShape(length,drop,corner=1.5,profile="rounded"){
+ const s=new THREE.Shape(),r=Math.max(.5,Math.min(corner,length*.12));
+ // Closed cubic contour: rounded nose/tail, flat upper land embedded into the fin root.
+ s.moveTo(r,1.2);
+ s.bezierCurveTo(r*.25,1.2,r*.15,-drop*.55,r,-drop);
+ s.bezierCurveTo(length*.22,-drop*1.02,length*.78,-drop*1.02,length-r,-drop);
+ s.bezierCurveTo(length-r*.15,-drop*.55,length-r*.25,1.2,length-r,1.2);
+ s.lineTo(r,1.2);
  return s;
 }
-function makeBasePiece(length,drop,thickness,xOffset,zOffset=0,withSlot=false){
- const shape=bezierBaseShape(length,drop,Math.min(2,length*.08),withSlot);
- const geo=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.45,bevelThickness:.35,curveSegments:12});
+function makeBasePiece(length,drop,thickness,xOffset,zOffset=0,bevel=.25){
+ const shape=bezierBaseShape(length,drop,Math.min(2.5,length*.08));
+ const geo=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.25,bevel),curveSegments:16});
  geo.translate(0,0,-thickness/2);
- const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.32,metalness:.18}));
+ const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.32,metalness:.12}));
  mesh.position.set(xOffset,0,zOffset);return mesh;
 }
 function updateFinBase(){
  if(!scene||!finMesh)return;
- if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
+ if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
  finBaseGroup=new THREE.Group();
- const B=state.base,drop=8,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
- // The fin mesh is translated by its complete outline bounds. Reuse that exact
- // translation and place the base in the unshifted root-chord coordinate system.
- const rootLeading=0,rootTrailing=B;
- let edgeMargin=0;
- if(state.box==="futures")edgeMargin=Math.max(0,(B-Math.max(45,B-12))/2);
- else if(state.box==="fcs1")edgeMargin=Math.max(0,B/2-(B*.30+19/2));
- else if(state.box==="usbox")edgeMargin=Math.max(0,B/2-55/2);
- const centerX=edgeMargin+(B-2*edgeMargin)*position;
+ const B=state.base,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
+ // Position is the base centre along the actual root chord, not its leading edge.
+ let length=0,drop=0,thickness=0,centerMin=0,centerMax=B;
+ if(state.box==="futures"){length=Math.max(45,B-12);drop=9.5;thickness=6.5;centerMin=length/2;centerMax=B-length/2;}
+ else if(state.box==="fcs1"){length=19;drop=8;thickness=3.5;centerMin=B*.30+length/2;centerMax=B-(B*.30+length/2);}
+ else if(state.box==="usbox"){length=Math.min(96.5,Math.max(55,B-12));drop=9.2;thickness=9.2;centerMin=length/2;centerMax=B-length/2;}
+ const centerX=centerMin+(centerMax-centerMin)*position;
  finBaseGroup.position.set(finMesh.position.x,finMesh.position.y,finMesh.position.z);
  const rootProfile=profile(.5,frontThicknessAt(0));
  finBaseGroup.position.z-=((rootProfile.top+rootProfile.bottom)/2);
  finBaseGroup.position.z+=Number(state.baseLateral||0);
- const materialColor=0xa8b5b8;
  if(state.box==="futures"){
-  // One continuous full-length tab with a rear engagement shoulder.
-  const length=Math.max(45,B-12);
-  finBaseGroup.add(makeBasePiece(length,drop,6.2,centerX-length/2));
-  const stop=new THREE.Mesh(new THREE.BoxGeometry(3,2.2,6.2),new THREE.MeshStandardMaterial({color:materialColor,roughness:.35,metalness:.2}));
-  stop.position.set(centerX-length/2+length-4,-1.2,0);finBaseGroup.add(stop);
+  // Futures single-tab approximation: one continuous tongue with softened ends.
+  finBaseGroup.add(makeBasePiece(length,drop,thickness,centerX-length/2,0,.35));
+  // Small integral engagement shoulder at the rear; no screw or box geometry.
+  const shoulder=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.4,thickness),new THREE.MeshStandardMaterial({color:0xa8b5b8,roughness:.35,metalness:.12}));
+  shoulder.position.set(centerX+length/2-3,-1.0,0);finBaseGroup.add(shoulder);
  }else if(state.box==="fcs1"){
-  // Classic FCS I: two independent tabs along the chord, not an FCS II click-in base.
-  const tabLength=19,tabThickness=3.5,tabDrop=8;
-  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX-B*.30-tabLength/2));
-  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX+B*.30-tabLength/2));
+  // Classic FCS I: two separate tabs, 34 mm nominal centre spacing.
+  const spacing=34,tabLength=19,tabThickness=3.5,tabDrop=8;
+  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX-spacing/2-tabLength/2,0,.3));
+  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX+spacing/2-tabLength/2,0,.3));
  }else if(state.box==="usbox"){
-  // Longboard-style fin tab; nominal dimensions are a configurable design proxy.
-  finBaseGroup.add(makeBasePiece(55,8,6.35,centerX-27.5,0,true));
+  // US longboard fin tongue based on the supplied drawing: 9.2 mm wide,
+  // 9.2 mm drop and 96.5 mm nominal usable length. Pin and screw omitted.
+  finBaseGroup.add(makeBasePiece(length,drop,thickness,centerX-length/2,0,.2));
  }else{
   scene.add(finBaseGroup);return;
  }
- // Orange center datum: fixed at the root-chord midpoint, independent of the movable base.
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
  datum.position.set(B/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);
  scene.add(finBaseGroup);
