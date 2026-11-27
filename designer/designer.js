@@ -87,7 +87,7 @@ function makeFuturesFootprint(){
 }
 function makeFuturesBase(xOffset){
  const group=new THREE.Group();
- const base=makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,-Wf/2,0,.12);
+ const base=makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,0,0,.12);
  group.add(base);
  // Futures grub-screw engagement land: a raised, tapered boss at the rear.
  // The rear-open Ø4.4 relief remains accessible from the end.
@@ -95,9 +95,9 @@ function makeFuturesBase(xOffset){
  bossShape.moveTo(0,0);bossShape.lineTo(8.5,0);bossShape.lineTo(8.5,1.2);
  bossShape.quadraticCurveTo(5.5,2.4,0,1.2);bossShape.closePath();
  const bossGeo=new THREE.ExtrudeGeometry(bossShape,{depth:Wf+1.0,bevelEnabled:true,bevelSegments:2,bevelSize:.2,bevelThickness:.15,steps:1});
- bossGeo.translate(0,0,-(Wf+1.0)/2);
+ bossGeo.rotateX(-Math.PI/2);bossGeo.translate(0,-(Wf+1.0)/2,0);
  const boss=new THREE.Mesh(bossGeo,new THREE.MeshStandardMaterial({color:0x87979d,roughness:.3,metalness:.12}));
- boss.position.set(xOffset+Lfuture-8.5,0,-17.7);group.add(boss);
+ boss.position.set(xOffset+Lfuture-8.5,0,0);group.add(boss);
  return group;
 }
 const Lfuture=113.5;
