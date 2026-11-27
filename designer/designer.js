@@ -73,17 +73,23 @@ function bezierPoint(seg,t){
 function splineIntersections(y){
  const shape=getOutlinePoints(),segs=shape.segments,hits=[]; y*=shape.height/state.height;
  for(const seg of segs){
-  const y0=seg[0][1],y1=seg[3][1],lo=Math.min(y0,y1),hi=Math.max(y0,y1);
-  if(y<lo-1e-9||y>hi+1e-9)continue;
-  if(Math.abs(y1-y0)<1e-12){if(Math.abs(y-y0)<1e-9)hits.push(seg[0][0],seg[3][0]);continue;}
-  let a=0,b=1;const ascending=y1>y0;
-  for(let k=0;k<48;k++){
-   const m=(a+b)/2,ym=bezierPoint(seg,m)[1];
-   if((ym<y)===ascending)a=m;else b=m;
+  let t0=0,p0=bezierPoint(seg,0);
+  for(let k=1;k<=240;k++){
+   const t1=k/240,p1=bezierPoint(seg,t1),d0=p0[1]-y,d1=p1[1]-y;
+   if(Math.abs(d0)<1e-9)hits.push(p0[0]);
+   if(d0*d1<0){
+    let lo=t0,hi=t1,sign=d0<0;
+    for(let j=0;j<42;j++){
+     const mid=(lo+hi)/2,ym=bezierPoint(seg,mid)[1];
+     if((ym<y)===sign)lo=mid;else hi=mid;
+    }
+    hits.push(bezierPoint(seg,(lo+hi)/2)[0]);
+   }
+   p0=p1;t0=t1;
   }
-  hits.push(bezierPoint(seg,(a+b)/2)[0]);
+  if(Math.abs(p0[1]-y)<1e-9)hits.push(p0[0]);
  }
- return hits.sort((a,b)=>a-b);
+ return hits.sort((a,b)=>a-b).filter((v,i,arr)=>i===0||Math.abs(v-arr[i-1])>1e-5);
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
 function outlineAt(v){
@@ -110,10 +116,16 @@ function bezierAnchor(segIndex,cpIndex){
  return cpIndex===1?seg[0]:seg[3];
 }
 function syncBezierJoin(segIndex,cpIndex,point){
- const segs=getOutlinePoints().segments;
- segs[segIndex][cpIndex]=point;
- if(cpIndex===0&&segIndex>0)segs[segIndex-1][3]=point;
- if(cpIndex===3&&segIndex<segs.length-1)segs[segIndex+1][0]=point;
+ const segs=getOutlinePoints().segments,seg=segs[segIndex],old=seg[cpIndex],dx=point[0]-old[0],dy=point[1]-old[1];
+ seg[cpIndex]=point;
+ if(cpIndex===0){
+  seg[1]=[seg[1][0]+dx,seg[1][1]+dy];
+  if(segIndex>0){segs[segIndex-1][3]=point;segs[segIndex-1][2]=[segs[segIndex-1][2][0]+dx,segs[segIndex-1][2][1]+dy];}
+ }
+ if(cpIndex===3){
+  seg[2]=[seg[2][0]+dx,seg[2][1]+dy];
+  if(segIndex<segs.length-1){segs[segIndex+1][0]=point;segs[segIndex+1][1]=[segs[segIndex+1][1][0]+dx,segs[segIndex+1][1][1]+dy];}
+ }
 }
 function drawOutlineHandles(){
  const group=$("outline-handles"),tg=$("tangent-handles");if(!group||!tg)return;
