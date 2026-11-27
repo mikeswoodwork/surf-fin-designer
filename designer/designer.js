@@ -43,7 +43,7 @@ const sourceSplines={
  [[147.3846,103.7579],[145.524,108.5455],[139.7522,114.3],[125.7,114.3]],
  [[125.7,114.3],[104.9757,114.3],[51.8146,98.9062],[0,0]]
  ]},
- fin25:{height:127,base:191.9363,segments:[
+ fin25:{height:126.9996,base:191.9363,segments:[
  [[191.9363,0],[191.9363,0],[85.1036,126.9996],[-25.6148,126.9996]],
  [[-25.6148,126.9996],[-55.0001,126.9997],[-70.0745,115.7858],[-70.0747,109.8425]],
  [[-70.0747,109.8425],[-70.0746,95.6299],[-5.2327,81.2764],[0,0]]
@@ -73,15 +73,15 @@ function bezierPoint(seg,t){
 function splineIntersections(y){
  const shape=getOutlinePoints(),segs=shape.segments,hits=[]; y*=shape.height/state.height;
  for(const seg of segs){
-  let prev=bezierPoint(seg,0);
-  for(let k=1;k<=160;k++){
-   const cur=bezierPoint(seg,k/160);
-   if((prev[1]<=y&&cur[1]>=y)||(cur[1]<=y&&prev[1]>=y)){
-    const dy=cur[1]-prev[1],t=Math.abs(dy)<1e-9?0:(y-prev[1])/dy;
-    hits.push(prev[0]+(cur[0]-prev[0])*t);
-   }
-   prev=cur;
+  const y0=seg[0][1],y1=seg[3][1],lo=Math.min(y0,y1),hi=Math.max(y0,y1);
+  if(y<lo-1e-9||y>hi+1e-9)continue;
+  if(Math.abs(y1-y0)<1e-12){if(Math.abs(y-y0)<1e-9)hits.push(seg[0][0],seg[3][0]);continue;}
+  let a=0,b=1;const ascending=y1>y0;
+  for(let k=0;k<48;k++){
+   const m=(a+b)/2,ym=bezierPoint(seg,m)[1];
+   if((ym<y)===ascending)a=m;else b=m;
   }
+  hits.push(bezierPoint(seg,(a+b)/2)[0]);
  }
  return hits.sort((a,b)=>a-b);
 }
