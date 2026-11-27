@@ -33,55 +33,70 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);controls.target.set(0,0,0); }
+// Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
+// Coordinates are millimetres in a local frame: root chord on y=0, span on +y.
+const sourceSplines={
+ fin37:{height:114.3,base:110.8251,segments:[
+ [[110.8251,0],[110.8251,0],[104.5019,16.063],[104.5019,35.2421]],
+ [[104.5019,35.2421],[104.5019,68.6343],[132.8363,88.8802],[143.8321,96.6442]],
+ [[143.8321,96.6442],[145.7526,98.1124],[148.632,100.0125],[147.3846,103.7579]],
+ [[147.3846,103.7579],[145.524,108.5455],[139.7522,114.3],[125.7,114.3]],
+ [[125.7,114.3],[104.9757,114.3],[51.8146,98.9062],[0,0]]
+ ]},
+ fin25:{height:127,base:191.9368,segments:[
+ [[191.9368,0],[191.9368,0],[85.1038,126.9999],[-25.6149,126.9999]],
+ [[-25.6149,126.9999],[-55.0002,127],[-70.0747,115.786],[-70.0748,109.8428]],
+ [[-70.0748,109.8428],[-70.0748,95.6302],[-5.2327,81.2766],[0,0]]
+ ]},
+ fin15:{height:254,base:180.8438,segments:[
+ [[180.8438,0],[147.3031,58.7026],[65.9698,254],[-38.5918,254]],
+ [[-38.5918,254],[-58.4913,254],[-88.1094,246.0459],[-88.1094,228.7651]],
+ [[-88.1094,228.7651],[-88.1094,219.2556],[0.6784,147.773],[11.1799,76.5161]],
+ [[11.1799,76.5161],[17.7938,31.6445],[0,0],[0,0]]
+ ]},
+ fin7:{height:254,base:183.8071,segments:[
+ [[183.8071,0],[79.8315,229.713],[-35.3473,254],[-73.0197,254]],
+ [[-73.0197,254],[-86.8909,254],[-99.2815,251.4081],[-99.2815,239.0645]],
+ [[-99.2815,239.0645],[-99.2815,237.7405],[-98.9213,236.3978],[-98.1653,235.5173]],
+ [[-98.1653,235.5173],[-85.3225,220.4639],[32.9068,172.6868],[0,0]]
+ ]}
+};
 function defaultOutline(){
- const h=state.height;
- // Control stations are in millimetres from the root. Shapes are editable archetypes,
- // with the characteristic planforms of the selected fin family.
- if(state.template==="fin25")return {
-  // Original Blending Curves Fin 25, extracted from supplied 5-inch PDF vector path.
-  // 5-inch span is measured perpendicular to the straight base; source base scales to 191.9 mm.
-  lead:[[0,0],[-1.4,h*.1],[-4.0,h*.2],[-8.0,h*.3],[-13.9,h*.4],[-22.0,h*.5],[-33.0,h*.6],[-47.5,h*.7],[-64.3,h*.8],[-67.9,h*.9],[-70.0,h]],
-  trail:[[191.9,0],[180.4,h*.1],[167.9,h*.2],[154.6,h*.3],[140.2,h*.4],[124.7,h*.5],[107.6,h*.6],[88.6,h*.7],[66.4,h*.8],[38.2,h*.9],[-70.0,h]]
- };
- if(state.template==="__unused_quad")return {
-  // Compact rear quad fin: short span, narrow base and strongly swept tip.
-  lead:[[0,0],[8,h*.25],[22,h*.52],[43,h*.82],[61,h]],
-  trail:[[100,0],[94,h*.25],[80,h*.52],[65,h*.82],[61,h]]
- };
- if(state.template==="__unused_single")return {
-  // Upright singlefin: deep base, moderate rake and a narrow rounded tip.
-  lead:[[0,0],[5,h*.25],[13,h*.52],[27,h*.82],[39,h]],
-  trail:[[135,0],[130,h*.25],[113,h*.52],[76,h*.82],[39,h]]
- };
- if(state.template==="fin7")return {
-  // Original Blending Curves Fin 7, reconstructed from the supplied 10-inch PDF vector path.
-  // PDF scale: 72 pt/in; 10-inch span = 254 mm. Root chord = 183.8 mm.
-  lead:[[0,0],[11.94,h*.1],[24.86,h*.2],[38.97,h*.3],[54.44,h*.4],[71.65,h*.5],[91.10,h*.6],[113.60,h*.7],[140.73,h*.8],[176.51,h*.9],[257.00,h]],
-  trail:[[183.81,0],[179.93,h*.1],[178.69,h*.2],[178.76,h*.3],[181.99,h*.4],[188.84,h*.5],[200.02,h*.6],[216.42,h*.7],[240.10,h*.8],[273.28,h*.9],[257.00,h]]
- };
- if(state.template==="fin15")return {
-  // Original Blending Curves Fin 15, extracted from supplied 10-inch PDF vector path.
-  // 10-inch span is measured perpendicular to the straight root edge; root chord = 180.8 mm.
-  lead:[[0,0],[9.07,h*.1],[12.54,h*.2],[11.23,h*.3],[4.48,h*.4],[-7.60,h*.5],[-24.06,h*.6],[-44.10,h*.7],[-66.83,h*.8],[-88.10,h*.9],[-38.59,h]],
-  trail:[[180.84,0],[167.29,h*.1],[154.23,h*.2],[140.87,h*.3],[126.86,h*.4],[111.86,h*.5],[95.47,h*.6],[77.07,h*.7],[55.44,h*.8],[27.55,h*.9],[65.97,h]]
- };
- // Original Blending Curves Fin 37, extracted from the supplied 4.5-inch PDF vector path.
- // Stations are in mm, measured from the leading root; source height = 114.3 mm.
- if(state.template==="fin37")return {
-  lead:[[0,0],[6.20,h*.1],[12.86,h*.2],[20.07,h*.3],[27.94,h*.4],[36.61,h*.5],[46.33,h*.6],[57.48,h*.7],[70.77,h*.8],[87.99,h*.9],[125.70,h]],
-  trail:[[110.83,0],[107.42,h*.1],[105.33,h*.2],[104.51,h*.3],[105.46,h*.4],[108.82,h*.5],[114.87,h*.6],[124.00,h*.7],[136.74,h*.8],[147.61,h*.9],[125.70,h]]
- };
+ const s=sourceSplines[state.template]||sourceSplines.fin37;
+ return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base};
 }
-function pointSlope(points,k){const n=points.length,p=points[k];if(Number.isFinite(p.m))return p.m;if(k===0)return (points[1][0]-points[0][0])/(points[1][1]-points[0][1]);if(k===n-1)return (points[n-1][0]-points[n-2][0])/(points[n-1][1]-points[n-2][1]);return (points[k+1][0]-points[k-1][0])/(points[k+1][1]-points[k-1][1]);}
-function edgeX(points,y){
- const n=points.length;if(y<=points[0][1])return points[0][0];if(y>=points[n-1][1])return points[n-1][0];
- let i=0;while(i<n-2&&points[i+1][1]<y)i++;
- const p0=points[i],p1=points[i+1],dy=p1[1]-p0[1],t=(y-p0[1])/dy;
- const m0=pointSlope(points,i)*dy,m1=pointSlope(points,i+1)*dy,t2=t*t,t3=t2*t;
- return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
+function bezierPoint(seg,t){
+ const u=1-t,a=seg[0],b=seg[1],c=seg[2],d=seg[3];
+ return [u*u*u*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t*t*t*d[0],
+         u*u*u*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1]];
+}
+function splineIntersections(y){
+ const segs=getOutlinePoints().segments,hits=[];
+ for(const seg of segs){
+  let prev=bezierPoint(seg,0);
+  for(let k=1;k<=160;k++){
+   const cur=bezierPoint(seg,k/160);
+   if((prev[1]<=y&&cur[1]>=y)||(cur[1]<=y&&prev[1]>=y)){
+    const dy=cur[1]-prev[1],t=Math.abs(dy)<1e-9?0:(y-prev[1])/dy;
+    hits.push(prev[0]+(cur[0]-prev[0])*t);
+   }
+   prev=cur;
+  }
+ }
+ return hits.sort((a,b)=>a-b);
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
-function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead);if(state.template==="fin37"){const scale=state.base/110.83,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin25"){const scale=state.base/191.9,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin7"){const scale=state.base/183.81,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin15"){const scale=state.base/180.84,chord=rawChord*scale+(state.tip-104.56)*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}const targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
+function outlineAt(v){
+ const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,hits=splineIntersections(y);
+ if(hits.length<2)return [0,0];
+ const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/s.base;
+ const left=hits[0]*scale,right=hits[hits.length-1]*scale;
+ const sourceH=s.height,scaledY=y/sourceH;
+ const addTip=state.template==="fin15"?(state.tip-104.56)*scaledY:state.tip*scaledY;
+ return [left+state.sweep*scaledY,right+addTip+state.sweep*scaledY];
+}
+function pointSlope(points,k){return 0;}
+function edgeX(points,y){return 0;}
 function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
