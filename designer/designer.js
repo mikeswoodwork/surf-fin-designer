@@ -16,9 +16,12 @@ $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.a
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
 $("setup").addEventListener("change",e=>{state.setup=e.target.value;const next=state.setup==="single"?"fin7":state.setup==="twin"?"fin25":"fin37";state.template=next;$("template").value=next;outlinePoints=null;selectedPoint=null;templateValues();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
-$("box").addEventListener("change",e=>{state.box=e.target.value;});
+$("box").addEventListener("change",e=>{state.box=e.target.value;updateFinBase();});
+$("base-position").addEventListener("input",e=>{state.basePosition=Number(e.target.value);$("base-position-out").textContent=state.basePosition+"%";updateFinBase();});
+$("base-position-toggle").addEventListener("click",()=>{$("base-position-controls").hidden=!$("base-position-controls").hidden;$("base-position-toggle").textContent=$("base-position-controls").hidden?"Position anpassen":"Position schließen";});
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab,.tab-panel").forEach(n=>n.classList.remove("active"));b.classList.add("active");$("panel-"+b.dataset.tab).classList.add("active");}));
-let scene,camera,renderer,controls,finMesh,grid,viewMode="3d";
+let scene,camera,renderer,controls,finMesh,finBaseGroup,grid,viewMode="3d";
+state.basePosition=50;
 function init3d(){const host=$("viewport");try{scene=new THREE.Scene();scene.background=new THREE.Color("#14232c");camera=new THREE.PerspectiveCamera(35,1,.1,3000);camera.position.set(220,170,260);renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;host.innerHTML="";host.appendChild(renderer.domElement);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x53616a,2));const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(120,180,150);scene.add(key);const fill=new THREE.DirectionalLight(0x8fb6c4,1.1);fill.position.set(-150,30,-100);scene.add(fill);grid=new THREE.GridHelper(260,26,0x52636a,0x30434c);grid.rotation.x=Math.PI/2;grid.position.y=-1;scene.add(grid);resize();if(window.ResizeObserver)new ResizeObserver(resize).observe(host);else window.addEventListener("resize",resize);animate();}catch(err){host.innerHTML='<div class="preview-error"><strong>3D-Vorschau konnte nicht gestartet werden.</strong><span>'+String(err.message||err)+'</span><small>Bitte Safari neu laden oder WebGL in den Geräteeinstellungen prüfen.</small></div>';console.error("FINLAB 3D init:",err);}}
 function resize(){if(!renderer)return;const w=$("viewport").clientWidth,h=$("viewport").clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
 function animate(){requestAnimationFrame(animate);controls?.update();renderer?.render(scene,camera);}
@@ -45,8 +48,56 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  // close leading/trailing edges and root/tip perimeter
  for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
- const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);controls.target.set(0,0,0); }
-// Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
+ const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
+
+function bezierBaseShape(length,drop,topInset=0){
+ const s=new THREE.Shape();
+ // Cubic Bezier contour: rounded shoulders, straight lower land, smooth return.
+ s.moveTo(topInset,0);
+ s.bezierCurveTo(topInset+2,-drop*.08,topInset+2,-drop*.82,topInset+5,-drop);
+ s.bezierCurveTo(length*.28,-drop*1.04,length*.72,-drop*1.04,length-5,-drop);
+ s.bezierCurveTo(length-2,-drop*.82,length-2,-drop*.08,length-topInset,0);
+ s.lineTo(topInset,0);return s;
+}
+function makeBasePiece(length,drop,thickness,xOffset,zOffset=0){
+ const shape=bezierBaseShape(length,drop,Math.min(2,length*.08));
+ const geo=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.45,bevelThickness:.35,curveSegments:12});
+ geo.translate(0,0,-thickness/2);
+ const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.32,metalness:.18}));
+ mesh.position.set(xOffset,0,zOffset);return mesh;
+}
+function updateFinBase(){
+ if(!scene||!finMesh)return;
+ if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
+ finBaseGroup=new THREE.Group();
+ const B=state.base,drop=8,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
+ const centerX=-B/2+position*B;
+ const materialColor=0xa8b5b8;
+ if(state.box==="futures"){
+  // One continuous full-length tab with a rear engagement shoulder.
+  const length=Math.max(45,B-12);
+  finBaseGroup.add(makeBasePiece(length,drop,6.2,centerX-length/2));
+  const stop=new THREE.Mesh(new THREE.BoxGeometry(3,2.2,6.2),new THREE.MeshStandardMaterial({color:materialColor,roughness:.35,metalness:.2}));
+  stop.position.set(centerX-length/2+length-4,-1.2,0);finBaseGroup.add(stop);
+ }else if(state.box==="fcs1"){
+  // Classic FCS I: two independent tabs along the chord, not an FCS II click-in base.
+  const tabLength=19,tabThickness=3.5,tabDrop=8;
+  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX-B*.30-tabLength/2));
+  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX+B*.30-tabLength/2));
+ }else if(state.box==="usbox"){
+  // Longboard-style fin tab; nominal dimensions are a configurable design proxy.
+  finBaseGroup.add(makeBasePiece(55,8,6.35,centerX-27.5));
+  const hole=new THREE.Mesh(new THREE.CylinderGeometry(2,2,1.2,24),new THREE.MeshStandardMaterial({color:0x26343a,roughness:.5}));
+  hole.rotation.x=Math.PI/2;hole.position.set(centerX,-4,0);finBaseGroup.add(hole);
+ }else{
+  scene.add(finBaseGroup);return;
+ }
+ // Orange center datum: fixed at the root-chord midpoint, independent of the movable base.
+ const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
+ datum.position.set(0,-.7,0);finBaseGroup.add(datum);
+ scene.add(finBaseGroup);
+}
+\n// Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
 // Coordinates are millimetres in a local frame: root chord on y=0, span on +y.
 const sourceSplines={
  fin37:{height:114.3,base:110.8251,segments:[
@@ -253,7 +304,7 @@ function renderBezierHandles(svgId,groupId,tangentId,segs,map,selection,kind){
 }
 function updateTechnicalViews(){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));drawOutlineHandles();const top=[],tm=topFoilMap();for(let i=0;i<=100;i++){const u=i/100,q=splineValue(foilSpline,u,0,1);top.push(tm.toSvg([u,q[1]]));}if(state.foilType==="symmetric"){for(let i=100;i>=0;i--){const u=i/100,q=splineValue(foilSpline,u,0,1);top.push(tm.toSvg([u,-q[1]]));}}else{for(let i=100;i>=0;i--)top.push(tm.toSvg([i/100,0]));}$("top-view-path").setAttribute("d",top.map((p,i)=>(i?"L":"M")+p[0].toFixed(2)+","+p[1].toFixed(2)).join(" ")+" Z");const front=[];for(let i=0;i<=80;i++){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.top,z]);}for(let i=80;i>=0;i--){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.bottom,z]);}const fm=frontMap();$("front-view-path").setAttribute("d",front.map((p,i)=>{const q=fm.toSvg(p);return (i?"L":"M")+q[0].toFixed(2)+","+q[1].toFixed(2);}).join(" ")+" Z");renderBezierHandles("front-view","front-handles","front-tangents",getFrontSpline(),frontMap(),frontSelection,"front");renderBezierHandles("foil-svg","foil-handles","foil-tangents",foilSpline,foilMap(),foilSelection,"foil");renderBezierHandles("top-view","top-foil-handles","top-foil-tangents",foilSpline,topFoilMap(),foilSelection,"foil");}
 function updateFoil(){const pts=[];for(let i=0;i<=100;i++){const p=splineValue(foilSpline,i/100,0,1);pts.push([15+i/100*290,55-p[1]*34]);}if(state.foilType==="symmetric"){for(let i=100;i>=0;i--){const p=splineValue(foilSpline,i/100);pts.push([15+i/100*290,55+p[1]*34]);}}else{for(let i=100;i>=0;i--)pts.push([15+i/100*290,55]);}$("foil-path").setAttribute("d",pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ")+"Z");}
-function update(){[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();updateTechnicalViews();}
+function update(){[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("base-position").value=state.basePosition??50;$("base-position-out").textContent=(state.basePosition??50)+"%";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();updateTechnicalViews();}
 function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===mode));if(mode==="3d"){camera.position.set(220,170,260);controls.enableRotate=true;}else if(mode==="side"){camera.position.set(0,0,420);controls.enableRotate=false;}else{camera.position.set(420,0,0);controls.enableRotate=false;}controls.target.set(0,0,0);controls.update();}
 document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
