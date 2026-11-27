@@ -93,12 +93,26 @@ function makeFcsTab(xOffset,depthCenter){
  return makeFootprintMesh(s,7.7,xOffset,depthCenter-D/2,0,.12);
 }
 function makeUsBoxBase(xOffset){
- // 96.5 mm engagement profile, 9.2 mm fin-thickness, 16.4 mm insertion depth.
- const L=96.5,T=9.2,D=16.4,s=new THREE.Shape();
- s.moveTo(0,0);s.lineTo(6,0);s.lineTo(13,0);s.lineTo(22,2);s.lineTo(31,7.2);
- s.lineTo(39,9.2);s.lineTo(57.5,9.2);s.lineTo(66,7.2);s.lineTo(74,2);s.lineTo(83,0);s.lineTo(L,0);
- s.lineTo(L,D);s.lineTo(L-5,D);s.lineTo(L-11,D-2.5);s.lineTo(11,D-2.5);s.lineTo(5,D);s.lineTo(0,D);s.closePath();
- return makeFootprintMesh(s,T,xOffset,0,0,0);
+ // Bahne US surf box: dimensions transcribed from the user's 1:1 drawing.
+ // 175 mm is the complete box length, not the removable fin tongue.
+ // Section A-A defines 96.5 mm engagement span, 16.4 mm section depth,
+ // 60 degree lead-in ramp and a 35 mm rear end zone. Top view gives 9.2 mm
+ // width; the 9 mm dimension is the front end land. 24 mm is the complete
+ // box envelope height. Screw and retaining pin are intentionally omitted.
+ const L=96.5,W=9.2,D=16.4,lead=9.0,rear=35.0;
+ const s=new THREE.Shape(),rampRun=D/Math.tan(Math.PI/3),rearStart=L-rear;
+ // Male insert profile derived as the complementary engagement tongue.
+ // Keep the 60° entry ramp and 35 mm terminal seating section distinct.
+ s.moveTo(0,0);
+ s.lineTo(lead,0);
+ s.lineTo(lead+rampRun,D);
+ s.lineTo(rearStart,D);
+ s.lineTo(rearStart,D-2.4);
+ s.lineTo(L-5,D-2.4);
+ s.lineTo(L,D-5.0);
+ s.lineTo(L,0);
+ s.closePath();
+ return makeFootprintMesh(s,W,xOffset,0,0,0);
 }
 function updateFinBase(){
  if(!scene||!finMesh)return;
@@ -124,7 +138,10 @@ function updateFinBase(){
   finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
   finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
  }else if(state.box==="usbox"){
-  const L=96.5,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-L);
+  const L=96.5;
+  const rootCenter=(rootStart+rootEnd)/2;
+  const travel=Math.max(0,(rootLength-L)/2);
+  const center=rootCenter+(position-.5)*2*travel;
   finBaseGroup.add(makeUsBoxBase(center-L/2));
  }else{finMesh.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
