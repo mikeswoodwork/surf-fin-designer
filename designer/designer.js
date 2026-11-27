@@ -10,7 +10,7 @@ const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8,tip:0,sweep:0},fin25:{height:85,base:160,tip:70,sweep:58},fin7:{height:115,base:112,tip:36,sweep:43},fin15:{height:150,base:135,tip:40,sweep:24}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8,tip:0,sweep:0},fin25:{height:127,base:191.9,tip:0,sweep:0},fin7:{height:115,base:112,tip:36,sweep:43},fin15:{height:150,base:135,tip:40,sweep:24}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -38,9 +38,10 @@ function defaultOutline(){
  // Control stations are in millimetres from the root. Shapes are editable archetypes,
  // with the characteristic planforms of the selected fin family.
  if(state.template==="fin25")return {
-  // Broad fish keel: long base, fuller trailing edge and rounded swept tip.
-  lead:[[0,0],[8,h*.24],[23,h*.52],[45,h*.82],[67,h]],
-  trail:[[160,0],[157,h*.24],[145,h*.52],[111,h*.82],[67,h]]
+  // Original Blending Curves Fin 25, extracted from supplied 5-inch PDF vector path.
+  // 5-inch span is measured perpendicular to the straight base; source base scales to 191.9 mm.
+  lead:[[0,0],[-1.4,h*.1],[-4.0,h*.2],[-8.0,h*.3],[-13.9,h*.4],[-22.0,h*.5],[-33.0,h*.6],[-47.5,h*.7],[-64.3,h*.8],[-67.9,h*.9],[-70.0,h]],
+  trail:[[191.9,0],[180.4,h*.1],[167.9,h*.2],[154.6,h*.3],[140.2,h*.4],[124.7,h*.5],[107.6,h*.6],[88.6,h*.7],[66.4,h*.8],[38.2,h*.9],[-70.0,h]]
  };
  if(state.template==="__unused_quad")return {
   // Compact rear quad fin: short span, narrow base and strongly swept tip.
@@ -76,7 +77,7 @@ function edgeX(points,y){
  return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
-function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead);if(state.template==="fin37"){const scale=state.base/110.83,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}const targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
+function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead);if(state.template==="fin37"){const scale=state.base/110.83,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin25"){const scale=state.base/191.9,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}const targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
 function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
