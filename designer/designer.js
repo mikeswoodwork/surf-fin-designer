@@ -105,38 +105,77 @@ function outlineViewMap(){
  const ox=(320-(maxX-minX)*scale)/2,oy=(360-(maxY-minY)*scale)/2;
  return {scale,minX,minY,ox,oy,toSvg:([x,y])=>[ox+(x-minX)*scale,360-oy-(y-minY)*scale],toModel:([x,y])=>[(x-ox)/scale+minX,(360-y-oy)/scale+minY]};
 }
+function bezierAnchor(segIndex,cpIndex){
+ const seg=getOutlinePoints().segments[segIndex];
+ return cpIndex===1?seg[0]:seg[3];
+}
+function syncBezierJoin(segIndex,cpIndex,point){
+ const segs=getOutlinePoints().segments;
+ segs[segIndex][cpIndex]=point;
+ if(cpIndex===0&&segIndex>0)segs[segIndex-1][3]=point;
+ if(cpIndex===3&&segIndex<segs.length-1)segs[segIndex+1][0]=point;
+}
 function drawOutlineHandles(){
- const group=$("outline-handles");if(!group)return;const p=getOutlinePoints(),map=outlineViewMap();
- const displayPoint=(edge,q)=>{const v=q[1]/state.height,edges=outlineAt(v);return [edge==="lead"?edges[0]:edges[1],q[1]];};
- const items=[...p.lead.map((q,i)=>({edge:"lead",i,q:displayPoint("lead",q)})),...p.trail.map((q,i)=>({edge:"trail",i,q:displayPoint("trail",q)}))];
- group.innerHTML=items.map(({edge,i,q})=>{const [x,y]=map.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?8:7)+'"/>';}).join("");
- const tg=$("tangent-handles");if(tg){const chosen=selectedPoint?items.filter(q=>q.edge===selectedPoint.edge&&q.i===selectedPoint.i):[];tg.innerHTML=chosen.map(({edge,i,q})=>{const m=pointSlope(p[edge],i),a=map.toSvg(q),b=map.toSvg([q[0]+m*12,q[1]+12]);return '<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"/><circle class="tangent-handle" data-edge="'+edge+'" data-index="'+i+'" cx="'+b[0]+'" cy="'+b[1]+'" r="5"/>';}).join("");}
+ const group=$("outline-handles"),tg=$("tangent-handles");if(!group||!tg)return;
+ const segs=getOutlinePoints().segments,map=outlineViewMap(),els=[],lines=[];
+ segs.forEach((seg,si)=>{
+  [[0,1],[3,2]].forEach(([anchorIndex,handleIndex])=>{
+   const a=map.toSvg(seg[anchorIndex]),h=map.toSvg(seg[handleIndex]);
+   lines.push('<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+h[0]+'" y2="'+h[1]+'"/>');
+  });
+  seg.forEach((p,pi)=>{
+   // A shared join is drawn once, using the preceding segment's end.
+   if(pi===0&&si>0)return;
+   const [x,y]=map.toSvg(p),active=selectedPoint?.seg===si&&selectedPoint?.cp===pi;
+   const anchor=pi===0||pi===3;
+   els.push('<circle class="'+(anchor?'outline-handle':'tangent-handle')+(active?' selected':'')+'" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(anchor?(active?7:5):(active?6:4))+'"/>');
+  });
+ });
+ group.innerHTML=els.filter(s=>s.includes('outline-handle')).join("");
+ tg.innerHTML=lines.join("")+els.filter(s=>s.includes('tangent-handle')).join("");
+ updateTangentFields();
+}
+function updateTangentFields(){
+ const segs=getOutlinePoints().segments,sel=selectedPoint,wrap=$("tangent-controls");
+ if(!wrap)return;
+ if(!sel||sel.cp===0||sel.cp===3){wrap.innerHTML='<small>Wähle einen Bézier-Griffpunkt (kleiner Kreis), um seine Tangentenlänge und seinen Winkel numerisch einzustellen.</small>';return;}
+ const seg=segs[sel.seg],anchor=bezierAnchor(sel.seg,sel.cp),p=seg[sel.cp],dx=p[0]-anchor[0],dy=p[1]-anchor[1];
+ const len=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)*180/Math.PI;
+ wrap.innerHTML='<div class="tangent-fields"><label>Länge <input id="tangent-length" type="number" min="0" step="0.1" value="'+len.toFixed(2)+'"> mm</label><label>Winkel <input id="tangent-angle" type="number" step="0.1" value="'+angle.toFixed(1)+'"> °</label></div>';
+ $("tangent-length").addEventListener("change",applyTangentFields);
+ $("tangent-angle").addEventListener("change",applyTangentFields);
+}
+function applyTangentFields(){
+ if(!selectedPoint||selectedPoint.cp===0||selectedPoint.cp===3)return;
+ const seg=getOutlinePoints().segments[selectedPoint.seg],anchor=bezierAnchor(selectedPoint.seg,selectedPoint.cp);
+ const length=Math.max(0,Number($("tangent-length").value)||0),angle=(Number($("tangent-angle").value)||0)*Math.PI/180;
+ seg[selectedPoint.cp]=[anchor[0]+length*Math.cos(angle),anchor[1]+length*Math.sin(angle)];
+ update();
 }
 function bindOutlineEditor(){
  const svg=$("side-view");
- svg.addEventListener("pointerdown",e=>{const handle=e.target.closest(".outline-handle,.tangent-handle");if(!handle)return;e.preventDefault();dragPoint={edge:handle.dataset.edge,i:Number(handle.dataset.index),pointerId:e.pointerId,mode:handle.classList.contains("tangent-handle")?"tangent":"point"};selectedPoint={edge:dragPoint.edge,i:dragPoint.i};svg.setPointerCapture(e.pointerId);drawOutlineHandles();});
+ svg.addEventListener("pointerdown",e=>{
+  const handle=e.target.closest(".outline-handle,.tangent-handle");if(!handle)return;
+  e.preventDefault();dragPoint={seg:Number(handle.dataset.seg),cp:Number(handle.dataset.cp),pointerId:e.pointerId};
+  selectedPoint={seg:dragPoint.seg,cp:dragPoint.cp};svg.setPointerCapture(e.pointerId);drawOutlineHandles();
+ });
  svg.addEventListener("pointermove",e=>{
   if(!dragPoint||dragPoint.pointerId!==e.pointerId)return;
   const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
   const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=outlineViewMap(),p=map.toModel([local.x,local.y]);
-  const arr=getOutlinePoints()[dragPoint.edge],i=dragPoint.i;
-  if(dragPoint.mode==="tangent"){const base=arr[i],v=base[1]/state.height,root=edgeX(getOutlinePoints().lead,0),rootChord=Math.max(1,edgeX(getOutlinePoints().trail,0)-root),factor=(state.base*(1-v)+state.tip*v)/rootChord;arr[i].m=Math.max(-8,Math.min(8,((p[0]-outlineAt(v)[dragPoint.edge==="lead"?0:1])/12)/(Math.max(.05,factor))));}
-  else{const low=i===0?0:arr[i-1][1]+1,high=i===arr.length-1?state.height:arr[i+1][1]-1;p[1]=Math.max(low,Math.min(high,p[1]));const v=p[1]/state.height,edges=outlineAt(v),root=edgeX(getOutlinePoints().lead,0),rootChord=Math.max(1,edgeX(getOutlinePoints().trail,0)-root),factor=(state.base*(1-v)+state.tip*v)/rootChord,displayX=p[0],displayLead=edges[0];p[0]=dragPoint.edge==="lead"?displayX+root-state.sweep*v:root+(displayX-displayLead)/Math.max(.05,factor)+edgeX(getOutlinePoints().lead,p[1]);p[0]=Math.max(-15,Math.min(210,p[0]));arr[i]=p;}
+  const seg=getOutlinePoints().segments[dragPoint.seg],cp=dragPoint.cp;
+  if(cp===0||cp===3){
+   p[1]=Math.max(0,Math.min(state.height,p[1]));
+   syncBezierJoin(dragPoint.seg,cp,p);
+  }else seg[cp]=p;
   update();
  });
  const finish=e=>{if(dragPoint&&dragPoint.pointerId===e.pointerId)dragPoint=null;};
- svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);svg.addEventListener("lostpointercapture",()=>{dragPoint=null;});
- function selectHandle(e){const h=e.target.closest(".outline-handle");if(!h)return;selectedPoint={edge:h.dataset.edge,i:Number(h.dataset.index)};drawOutlineHandles();}
- svg.addEventListener("click",selectHandle);
- $("add-outline-point").addEventListener("click",()=>{
-  const edge=selectedPoint?.edge||"lead",arr=getOutlinePoints()[edge];
-  let i=selectedPoint?Math.min(selectedPoint.i,arr.length-2):Math.floor((arr.length-2)/2);
-  const a=arr[i],b=arr[i+1],point=[(a[0]+b[0])/2,(a[1]+b[1])/2];
-  arr.splice(i+1,0,point);selectedPoint={edge,i:i+1};update();
- });
- $("delete-outline-point").addEventListener("click",()=>{
-  if(!selectedPoint)return;const arr=getOutlinePoints()[selectedPoint.edge],i=selectedPoint.i;
-  if(i===0||i===arr.length-1)return;arr.splice(i,1);selectedPoint=null;update();
+ svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);
+ svg.addEventListener("lostpointercapture",()=>{dragPoint=null;});
+ svg.addEventListener("click",e=>{
+  const h=e.target.closest(".outline-handle,.tangent-handle");if(!h)return;
+  selectedPoint={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};drawOutlineHandles();
  });
 }
 async function importOutline(file){
