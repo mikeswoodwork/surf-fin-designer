@@ -80,7 +80,12 @@ function updateFinBase(){
  const B=state.base,drop=8,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
  // The fin mesh is translated by its complete outline bounds. Reuse that exact
  // translation and place the base in the unshifted root-chord coordinate system.
- const rootLeading=0,rootTrailing=B,centerX=rootLeading+(rootTrailing-rootLeading)*position;
+ const rootLeading=0,rootTrailing=B;
+ let edgeMargin=0;
+ if(state.box==="futures")edgeMargin=Math.max(0,(B-Math.max(45,B-12))/2);
+ else if(state.box==="fcs1")edgeMargin=Math.max(0,B/2-(B*.30+19/2));
+ else if(state.box==="usbox")edgeMargin=Math.max(0,B/2-55/2);
+ const centerX=edgeMargin+(B-2*edgeMargin)*position;
  finBaseGroup.position.set(finMesh.position.x,finMesh.position.y,finMesh.position.z);
  const rootProfile=profile(.5,frontThicknessAt(0));
  finBaseGroup.position.z-=((rootProfile.top+rootProfile.bottom)/2);
@@ -104,7 +109,7 @@ function updateFinBase(){
  }
  // Orange center datum: fixed at the root-chord midpoint, independent of the movable base.
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
- datum.position.set(B/2,1.5,0);finBaseGroup.add(datum);
+ datum.position.set(B/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);
  scene.add(finBaseGroup);
 }
 // Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
@@ -323,7 +328,7 @@ function exportSTL(){
  meshes.forEach(root=>{
   root.updateMatrixWorld(true);
   root.traverse(obj=>{
-   if(!obj.isMesh||!obj.geometry?.attributes?.position)return;
+   if(!obj.isMesh||obj.userData.referenceOnly||!obj.geometry?.attributes?.position)return;
    const g=obj.geometry,pos=g.attributes.position,idx=g.index;
    const count=idx?idx.count:pos.count;
    for(let i=0;i+2<count;i+=3){
