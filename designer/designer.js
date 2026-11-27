@@ -50,17 +50,23 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
 
-function bezierBaseShape(length,drop,topInset=0){
- const s=new THREE.Shape();
- // Cubic Bezier contour: rounded shoulders, straight lower land, smooth return.
- s.moveTo(topInset,0);
- s.bezierCurveTo(topInset+2,-drop*.08,topInset+2,-drop*.82,topInset+5,-drop);
+function bezierBaseShape(length,drop,topInset=0,hole=false){
+ const s=new THREE.Shape(),rootOverlap=1.2;
+ // The top land overlaps the fin root by 1.2 mm, avoiding a merely tangent contact.
+ s.moveTo(topInset,rootOverlap);
+ s.bezierCurveTo(topInset+2,rootOverlap-drop*.08,topInset+2,-drop*.82,topInset+5,-drop);
  s.bezierCurveTo(length*.28,-drop*1.04,length*.72,-drop*1.04,length-5,-drop);
- s.bezierCurveTo(length-2,-drop*.82,length-2,-drop*.08,length-topInset,0);
- s.lineTo(topInset,0);return s;
+ s.bezierCurveTo(length-2,-drop*.82,length-2,rootOverlap-drop*.08,length-topInset,rootOverlap);
+ s.lineTo(topInset,rootOverlap);
+ if(hole){
+  const cut=new THREE.Path();
+  cut.absellipse(length/2,-drop*.52,2.25,2.25,0,Math.PI*2,true,0);
+  s.holes.push(cut);
+ }
+ return s;
 }
-function makeBasePiece(length,drop,thickness,xOffset,zOffset=0){
- const shape=bezierBaseShape(length,drop,Math.min(2,length*.08));
+function makeBasePiece(length,drop,thickness,xOffset,zOffset=0,withSlot=false){
+ const shape=bezierBaseShape(length,drop,Math.min(2,length*.08),withSlot);
  const geo=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.45,bevelThickness:.35,curveSegments:12});
  geo.translate(0,0,-thickness/2);
  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.32,metalness:.18}));
@@ -71,7 +77,12 @@ function updateFinBase(){
  if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
  finBaseGroup=new THREE.Group();
  const B=state.base,drop=8,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
- const centerX=-B/2+position*B;
+ // The fin mesh is translated by its complete outline bounds. Reuse that exact
+ // translation and place the base in the unshifted root-chord coordinate system.
+ const rootLeading=0,rootTrailing=B,centerX=rootLeading+(rootTrailing-rootLeading)*position;
+ finBaseGroup.position.x=finMesh.position.x;
+ const rootProfile=profile(.5,frontThicknessAt(0));
+ finBaseGroup.position.z=-(rootProfile.top+rootProfile.bottom)/2;
  const materialColor=0xa8b5b8;
  if(state.box==="futures"){
   // One continuous full-length tab with a rear engagement shoulder.
@@ -86,15 +97,13 @@ function updateFinBase(){
   finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX+B*.30-tabLength/2));
  }else if(state.box==="usbox"){
   // Longboard-style fin tab; nominal dimensions are a configurable design proxy.
-  finBaseGroup.add(makeBasePiece(55,8,6.35,centerX-27.5));
-  const hole=new THREE.Mesh(new THREE.CylinderGeometry(2,2,1.2,24),new THREE.MeshStandardMaterial({color:0x26343a,roughness:.5}));
-  hole.rotation.x=Math.PI/2;hole.position.set(centerX,-4,0);finBaseGroup.add(hole);
+  finBaseGroup.add(makeBasePiece(55,8,6.35,centerX-27.5,0,true));
  }else{
   scene.add(finBaseGroup);return;
  }
  // Orange center datum: fixed at the root-chord midpoint, independent of the movable base.
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
- datum.position.set(0,-.7,0);finBaseGroup.add(datum);
+ datum.position.set(B/2,1.5,0);finBaseGroup.add(datum);
  scene.add(finBaseGroup);
 }
 // Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
@@ -308,11 +317,30 @@ function update(){[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-
 function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===mode));if(mode==="3d"){camera.position.set(220,170,260);controls.enableRotate=true;}else if(mode==="side"){camera.position.set(0,0,420);controls.enableRotate=false;}else{camera.position.set(420,0,0);controls.enableRotate=false;}controls.target.set(0,0,0);controls.update();}
 document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-function exportSTL(){finMesh.updateMatrixWorld(true);const g=finMesh.geometry;const pos=g.attributes.position,idx=g.index.array;let out="solid FINLAB\n";for(let i=0;i<idx.length;i+=3){const a=new THREE.Vector3().fromBufferAttribute(pos,idx[i]).applyMatrix4(finMesh.matrixWorld),b=new THREE.Vector3().fromBufferAttribute(pos,idx[i+1]).applyMatrix4(finMesh.matrixWorld),c=new THREE.Vector3().fromBufferAttribute(pos,idx[i+2]).applyMatrix4(finMesh.matrixWorld);const n=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();out+=`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`;}out+="endsolid FINLAB";download("finlab-fin.stl",new Blob([out],{type:"model/stl"}));}
+function exportSTL(){
+ const meshes=[finMesh,...(finBaseGroup?[finBaseGroup]:[])],triangles=[];
+ meshes.forEach(root=>{
+  root.updateMatrixWorld(true);
+  root.traverse(obj=>{
+   if(!obj.isMesh||!obj.geometry?.attributes?.position)return;
+   const g=obj.geometry,pos=g.attributes.position,idx=g.index;
+   const count=idx?idx.count:pos.count;
+   for(let i=0;i+2<count;i+=3){
+    const ia=idx?idx.getX(i):i,ib=idx?idx.getX(i+1):i+1,ic=idx?idx.getX(i+2):i+2;
+    const a=new THREE.Vector3().fromBufferAttribute(pos,ia).applyMatrix4(obj.matrixWorld);
+    const b=new THREE.Vector3().fromBufferAttribute(pos,ib).applyMatrix4(obj.matrixWorld);
+    const c=new THREE.Vector3().fromBufferAttribute(pos,ic).applyMatrix4(obj.matrixWorld);
+    const n=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();
+    triangles.push(`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`);
+   }
+  });
+ });
+ download("finlab-fin-mit-base.stl",new Blob(["solid FINLAB\n",...triangles,"endsolid FINLAB"],{type:"model/stl"}));
+}
 function exportSVG(){const p=outline(),xs=p.map(q=>q[0]),ys=p.map(q=>q[1]),minX=Math.min(...xs),minY=Math.min(...ys),w=Math.max(...xs)-minX,h=Math.max(...ys)-minY;const d=p.map((q,i)=>(i?"L":"M")+(q[0]-minX).toFixed(3)+","+(h-(q[1]-minY)).toFixed(3)).join(" ")+" Z";const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(2)}mm" height="${h.toFixed(2)}mm" viewBox="0 0 ${w.toFixed(3)} ${h.toFixed(3)}"><path d="${d}" fill="none" stroke="black" stroke-width="0.5"/></svg>`;download("finlab-outline.svg",new Blob([svg],{type:"image/svg+xml"}));}
 function exportDXF(){const p=outline();const rows=["0","SECTION","2","ENTITIES","0","LWPOLYLINE","8","FIN_OUTLINE","90",String(p.length),"70","1"];p.forEach(([x,y])=>rows.push("10",x.toFixed(3),"20",y.toFixed(3)));rows.push("0","ENDSEC","0","EOF");download("finlab-outline.dxf",new Blob([rows.join("\n")],{type:"application/dxf"}));}
 $("outline-file").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;try{await importOutline(file);}catch(err){$("outline-status").textContent="Import fehlgeschlagen: "+err.message;}});
 $("clear-outline").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;frontSpline=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
 $("export-stl").addEventListener("click",exportSTL);$("export-svg").addEventListener("click",exportSVG);$("export-dxf").addEventListener("click",exportDXF);$("export-json").addEventListener("click",()=>download("finlab-project.json",new Blob([JSON.stringify(state,null,2)],{type:"application/json"})));
-$("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
+$("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;state.basePosition=50;$("base-position").value=50;$("base-position-out").textContent="50%";$("base-position-controls").hidden=true;$("base-position-toggle").textContent="Position anpassen";$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";Object.assign(state,{...presets[state.finType],template:"upright",foilType:state.finType==="center"?"symmetric":"flat"});$("template").value="upright";$("foilType").value=state.foilType;syncInputs();update();});
 bindOutlineEditor();bindProfileEditors();$("finType").value=state.finType;$("setup").value=state.setup;$("box").value=state.box;$("foilType").value=state.foilType;$("template").value=state.template;if(state.template!=="custom")templateValues();buildControls();init3d();update();
