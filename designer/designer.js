@@ -77,7 +77,6 @@ function makeFuturesFootprint(){
  s.lineTo(L-3.8,W);s.lineTo(0,W);s.lineTo(0,W*.5+2.2);
  s.lineTo(3.3,W*.5+2.2);s.absarc(3.3,W*.5,2.2,Math.PI/2,-Math.PI/2,true);
  s.lineTo(0,W*.5-2.2);s.closePath();
- const slot=new THREE.Path();slot.absarc(3.3,W*.5,2.2,0,Math.PI*2,true);s.holes.push(slot);
  return s;
 }
 function makeFuturesBase(xOffset){
@@ -137,7 +136,7 @@ function updateFinBase(){
   finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
   finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
  }else if(state.box==="usbox"){
-  const L=175,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
+  const L=96.5,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
   finBaseGroup.add(makeUsBoxBase(center-L/2));
  }else{scene.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
