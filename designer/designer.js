@@ -15,7 +15,7 @@ function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(i
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template="fin37";outlinePoints=null;frontSpline=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
-$("setup").addEventListener("change",e=>{state.setup=e.target.value;const next=state.setup==="single"?"fin7":state.setup==="twin"?"fin25":"fin37";state.template=next;$("template").value=next;outlinePoints=null;selectedPoint=null;templateValues();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
+$("setup").addEventListener("change",e=>{state.setup=e.target.value;const nextFin=state.setup==="single"?"center":"side";if(state.finType!==nextFin){state.finType=nextFin;Object.assign(state,presets[nextFin]);$("finType").value=nextFin;$("foilType").value=nextFin==="center"?"symmetric":"flat";state.foilType=$("foilType").value;}const next=state.setup==="single"?"fin7":state.setup==="twin"?"fin25":"fin37";state.template=next;$("template").value=next;outlinePoints=null;selectedPoint=null;templateValues();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
 $("box").addEventListener("change",e=>{state.box=e.target.value;updateFinBase();});
 $("base-position").addEventListener("input",e=>{state.basePosition=Number(e.target.value);$("base-position-out").textContent=state.basePosition+"%";updateFinBase();});
 $("base-lateral").addEventListener("input",e=>{state.baseLateral=Number(e.target.value);$("base-lateral-out").textContent=(state.baseLateral>0?"+":"")+state.baseLateral.toFixed(1)+" mm";updateFinBase();});
@@ -131,17 +131,15 @@ function updateFinBase(){
  // The base is centred on the local foil mid-plane (not mirrored below it).
  finBaseGroup.position.set(0,(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0);
  if(state.box==="futures"){
-  const L=113.5,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-L);
+  const L=113.5,center=rootStart+rootLength*position;
   finBaseGroup.add(makeFuturesBase(center-L/2));
  }else if(state.box==="fcs1"){
-  const tabL=19,spacing=34,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-spacing-tabL);
+  const tabL=19,spacing=34,center=rootStart+rootLength*position;
   finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
   finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
  }else if(state.box==="usbox"){
   const L=96.5;
-  const rootCenter=(rootStart+rootEnd)/2;
-  const travel=Math.max(0,(rootLength-L)/2);
-  const center=rootCenter+(position-.5)*2*travel;
+  const center=rootStart+rootLength*position;
   finBaseGroup.add(makeUsBoxBase(center-L/2));
  }else{finMesh.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
