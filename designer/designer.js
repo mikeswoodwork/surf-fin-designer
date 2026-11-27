@@ -62,96 +62,65 @@ function roundedRectShape(length,width,radius){
  s.lineTo(r,width);s.quadraticCurveTo(0,width,0,width-r);
  s.lineTo(0,r);s.quadraticCurveTo(0,0,r,0);return s;
 }
-function makeFootprintMesh(shape,height,xOffset,yOffset=0,zOffset=0,bevel=.15){
- const g=new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.15,bevel),curveSegments:20});
- // Convert the sketch plane (chord x / insertion depth y) and extrusion
- // into fin-local axes: insertion follows local span z, thickness follows y.
- g.rotateX(Math.PI/2);
- g.translate(0,height/2,0);
+function makeFootprintMesh(shape,thickness,xOffset,depthOffset=0,zOffset=0,bevel=.15){
+ // x = chord, y = insertion depth, extrusion z = foil thickness.
+ // Map to fin-local coordinates (x, thickness, span): (x,y,z)->(x,z,-y).
+ const g=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.15,bevel),curveSegments:20});
+ g.rotateX(-Math.PI/2);g.translate(0,-thickness/2,0);
  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
- m.position.set(xOffset,yOffset,zOffset);return m;
+ m.position.set(xOffset,0,zOffset);return m;
 }
 function makeFuturesFootprint(){
- // Plan contour from the supplied Side Fin / Quad Front drawing.
- // Leading end is plain; the Ø4.4 retaining relief is placed at the rear,
- // as requested. Overall chord = 113.5 mm, across-fin width = 7.7 mm.
- const L=113.5,W=17.7,s=new THREE.Shape(),r=2.2;
- s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L-3.8,0.8);
- s.lineTo(L,2.1);s.lineTo(L,W-2.1);s.lineTo(L-3.8,W-0.8);
- s.lineTo(L-10.5,W);s.lineTo(0,W);
- // Rear-open rounded screw engagement notch: Ø4.4, centre 3.3 mm from rear.
- s.lineTo(L-3.3,W/2+r);
- s.absarc(L-3.3,W/2,r,Math.PI/2,-Math.PI/2,true);
- s.lineTo(L-3.3,W/2-r);s.lineTo(0,0);s.closePath();
- return s;
+ const L=113.5,D=17.7,r=2.2,s=new THREE.Shape();
+ // rear-open Ø4.4 notch at x=0; 3.3 mm centre setback from rear.
+ s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L-3.8,.8);s.lineTo(L,2.1);
+ s.lineTo(L,D-2.1);s.lineTo(L-3.8,D-.8);s.lineTo(L-10.5,D);s.lineTo(0,D);
+ s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,Math.PI*1.5,false);s.lineTo(0,D/2-r);s.closePath();return s;
 }
 function makeFuturesBase(xOffset){
- const group=new THREE.Group();
- const base=makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,0,0,.12);
- group.add(base);
- // Futures grub-screw engagement land: a raised, tapered boss at the rear.
- // The rear-open Ø4.4 relief remains accessible from the end.
- const bossShape=new THREE.Shape();
- bossShape.moveTo(0,0);bossShape.lineTo(8.5,0);bossShape.lineTo(8.5,1.2);
- bossShape.quadraticCurveTo(5.5,2.4,0,1.2);bossShape.closePath();
- const bossGeo=new THREE.ExtrudeGeometry(bossShape,{depth:Wf+1.0,bevelEnabled:true,bevelSegments:2,bevelSize:.2,bevelThickness:.15,steps:1});
- bossGeo.rotateX(-Math.PI/2);bossGeo.translate(0,-(Wf+1.0)/2,0);
- const boss=new THREE.Mesh(bossGeo,new THREE.MeshStandardMaterial({color:0x87979d,roughness:.3,metalness:.12}));
- boss.position.set(xOffset+Lfuture-8.5,0,0);group.add(boss);
- return group;
+ const g=new THREE.Group(),D=17.7;
+ g.add(makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,0,0,.12));
+ // Screw engagement boss on the rear shoulder, aligned with open end slot.
+ const boss=new THREE.Shape();boss.moveTo(0,D/2-3);boss.lineTo(7.5,D/2-3);
+ boss.quadraticCurveTo(9,D/2,7.5,D/2+3);boss.lineTo(0,D/2+3);boss.closePath();
+ g.add(makeFootprintMesh(boss,9,xOffset,0,0,.12));return g;
 }
-const Lfuture=113.5;
-const Wf=17.7;
-function makeFcsTab(xOffset,tabCenter){
- // FCS G5/G7 drawing specifies 34 mm tab distance. Two independent plug tabs.
- // The 112/114 mm figures are fin base chord, not the tab's own length.
- const L=19,W=10.8,r=1.8,s=roundedRectShape(L,W,r);
- // Small softened retention shoulders on the tab perimeter.
- const mesh=makeFootprintMesh(s,7.7,xOffset,tabCenter-W/2,0,.12);
- return mesh;
+function makeFcsTab(xOffset,depthCenter){
+ const L=19,D=10.8,s=roundedRectShape(L,D,1.8);
+ return makeFootprintMesh(s,7.7,xOffset,depthCenter-D/2,0,.12);
 }
 function makeUsBoxBase(xOffset){
- // Supplied US-box drawing: 175 overall length, 9.2 mm top-view width,
- // 24 mm front-view height envelope, 16.4 mm section depth and 60° internal ramp.
- const L=96.5,W=9.2,H=16.4,s=new THREE.Shape();
- // Side elevation in (length, vertical) coordinates. End shoulders and central
- // recessed run are traced from the front/section views rather than a capsule.
- s.moveTo(0,0);s.lineTo(13,0);s.lineTo(22,0);s.lineTo(31,0);
- s.lineTo(39,-3.2);s.lineTo(46,-7.8);s.lineTo(51,-9.2);
- s.lineTo(137,-9.2);s.lineTo(145,-7.8);s.lineTo(151,-3.0);
- s.lineTo(158,0);s.lineTo(175,0);s.lineTo(175,-4.5);
- s.lineTo(170,-8.2);s.lineTo(164,-16.4);s.lineTo(11,-16.4);
- s.lineTo(5,-8.2);s.lineTo(0,-4.5);s.closePath();
- const g=new THREE.ExtrudeGeometry(s,{depth:W,bevelEnabled:false,steps:1,curveSegments:16});
- g.scale(96.5/175,1,1);
- g.rotateX(Math.PI/2);g.translate(0,W/2,0);
- const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
- mesh.position.set(xOffset,0,0);return mesh;
+ // 96.5 mm engagement profile, 9.2 mm fin-thickness, 16.4 mm insertion depth.
+ const L=96.5,T=9.2,D=16.4,s=new THREE.Shape();
+ s.moveTo(0,0);s.lineTo(6,0);s.lineTo(13,0);s.lineTo(22,2);s.lineTo(31,7.2);
+ s.lineTo(39,9.2);s.lineTo(57.5,9.2);s.lineTo(66,7.2);s.lineTo(74,2);s.lineTo(83,0);s.lineTo(L,0);
+ s.lineTo(L,D);s.lineTo(L-5,D);s.lineTo(L-11,D-2.5);s.lineTo(11,D-2.5);s.lineTo(5,D);s.lineTo(0,D);s.closePath();
+ return makeFootprintMesh(s,T,xOffset,0,0,0);
 }
 function updateFinBase(){
  if(!scene||!finMesh)return;
  if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
  finBaseGroup=new THREE.Group();
- const B=state.base,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
- finBaseGroup.position.copy(finMesh.position);
- finBaseGroup.rotation.copy(finMesh.rotation);
- const rootProfile=profile(.5,frontThicknessAt(0));
- finBaseGroup.position.add(new THREE.Vector3(0,-((rootProfile.top+rootProfile.bottom)/2)+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
+ const position=Math.max(0,Math.min(100,state.basePosition??50))/100;
+ const root=outlineAt(0),rootMin=Math.min(...root),rootMax=Math.max(...root);
+ finMesh.geometry.computeBoundingBox();const bb=finMesh.geometry.boundingBox,meshCenterX=(bb.min.x+bb.max.x)/2;
+ const rootStart=rootMin-meshCenterX,rootEnd=rootMax-meshCenterX,rootLength=rootEnd-rootStart;
+ finBaseGroup.position.copy(finMesh.position);finBaseGroup.rotation.copy(finMesh.rotation);
+ const rp=profile(.5,frontThicknessAt(0));
+ finBaseGroup.position.add(new THREE.Vector3(0,-(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
  if(state.box==="futures"){
-  const L=113.5,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
-  const g=makeFuturesBase(center-L/2-B/2);
-  g.position.y=0;finBaseGroup.add(g);
+  const L=113.5,usable=Math.min(L,rootLength),center=rootStart+usable/2+(rootLength-usable)*position;
+  finBaseGroup.add(makeFuturesBase(center-usable/2));
  }else if(state.box==="fcs1"){
-  const tabL=19,spacing=34,centerMin=spacing/2+tabL/2,centerMax=B-(spacing/2+tabL/2),center=centerMin+(centerMax-centerMin)*position;
-  finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2-B/2,0));
-  finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2-B/2,0));
+  const tabL=19,spacing=34,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-spacing-tabL);
+  finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
+  finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
  }else if(state.box==="usbox"){
-  const L=96.5,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
-  finBaseGroup.add(makeUsBoxBase(center-L/2-B/2));
+  const L=96.5,usable=Math.min(L,rootLength),center=rootStart+usable/2+(rootLength-usable)*position;
+  finBaseGroup.add(makeUsBoxBase(center-usable/2));
  }else{scene.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
- datum.position.set(B/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);
- scene.add(finBaseGroup);
+ datum.position.set((rootStart+rootEnd)/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);scene.add(finBaseGroup);
 }
 // Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
 // Coordinates are millimetres in a local frame: root chord on y=0, span on +y.
