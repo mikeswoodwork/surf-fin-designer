@@ -10,7 +10,7 @@ const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8,tip:0,sweep:0},fin25:{height:127,base:191.9,tip:0,sweep:0},fin7:{height:115,base:112,tip:36,sweep:43},fin15:{height:254,base:180.8,tip:104.6,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8,tip:0,sweep:0},fin25:{height:127,base:191.9,tip:0,sweep:0},fin7:{height:254,base:183.8,tip:0,sweep:0},fin15:{height:254,base:180.8,tip:104.6,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -54,8 +54,10 @@ function defaultOutline(){
   trail:[[135,0],[130,h*.25],[113,h*.52],[76,h*.82],[39,h]]
  };
  if(state.template==="fin7")return {
-  lead:[[0,0],[3,h*.18],[10,h*.40],[21,h*.66],[35,h*.86],[44,h]],
-  trail:[[112,0],[108,h*.18],[98,h*.40],[81,h*.64],[59,h*.84],[44,h]]
+  // Original Blending Curves Fin 7, reconstructed from the supplied 10-inch PDF vector path.
+  // PDF scale: 72 pt/in; 10-inch span = 254 mm. Root chord = 183.8 mm.
+  lead:[[0,0],[11.94,h*.1],[24.86,h*.2],[38.97,h*.3],[54.44,h*.4],[71.65,h*.5],[91.10,h*.6],[113.60,h*.7],[140.73,h*.8],[176.51,h*.9],[257.00,h]],
+  trail:[[183.81,0],[179.93,h*.1],[178.69,h*.2],[178.76,h*.3],[181.99,h*.4],[188.84,h*.5],[200.02,h*.6],[216.42,h*.7],[240.10,h*.8],[273.28,h*.9],[257.00,h]]
  };
  if(state.template==="fin15")return {
   // Original Blending Curves Fin 15, extracted from supplied 10-inch PDF vector path.
@@ -79,7 +81,7 @@ function edgeX(points,y){
  return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
-function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead);if(state.template==="fin37"){const scale=state.base/110.83,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin25"){const scale=state.base/191.9,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin15"){const scale=state.base/180.84,chord=rawChord*scale+(state.tip-104.56)*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}const targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
+function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead);if(state.template==="fin37"){const scale=state.base/110.83,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin25"){const scale=state.base/191.9,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin7"){const scale=state.base/183.81,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}if(state.template==="fin15"){const scale=state.base/180.84,chord=rawChord*scale+(state.tip-104.56)*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}const targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
 function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
