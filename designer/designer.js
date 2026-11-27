@@ -63,7 +63,7 @@ const sourceSplines={
 };
 function defaultOutline(){
  const s=sourceSplines[state.template]||sourceSplines.fin37;
- return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base};
+ return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base,lead:[],trail:[]};
 }
 function bezierPoint(seg,t){
  const u=1-t,a=seg[0],b=seg[1],c=seg[2],d=seg[3];
@@ -71,7 +71,7 @@ function bezierPoint(seg,t){
          u*u*u*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1]];
 }
 function splineIntersections(y){
- const segs=getOutlinePoints().segments,hits=[];
+ const shape=getOutlinePoints(),segs=shape.segments,hits=[]; y*=shape.height/state.height;
  for(const seg of segs){
   let prev=bezierPoint(seg,0);
   for(let k=1;k<=160;k++){
