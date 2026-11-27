@@ -97,7 +97,7 @@ function updateFinBase(){
  datum.position.set(0,-.7,0);finBaseGroup.add(datum);
  scene.add(finBaseGroup);
 }
-\n// Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
+// Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
 // Coordinates are millimetres in a local frame: root chord on y=0, span on +y.
 const sourceSplines={
  fin37:{height:114.3,base:110.8251,segments:[
