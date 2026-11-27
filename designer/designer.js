@@ -320,7 +320,7 @@ function bindPointKeyboard(){
    const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
    if(cp===0){seg[1]=[seg[1][0]+ox,seg[1][1]+oy];if(si>0){segs[si-1][3]=p;segs[si-1][2]=[segs[si-1][2][0]+ox,segs[si-1][2][1]+oy];}}
    if(cp===3){seg[2]=[seg[2][0]+ox,seg[2][1]+oy];if(si<segs.length-1){segs[si+1][0]=p;segs[si+1][1]=[segs[si+1][1][0]+ox,segs[si+1][1][1]+oy];}}
-   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};update();e.preventDefault();return;
+   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};const svgId=focused.closest("svg")?.id;update();requestAnimationFrame(()=>{const groupId=svgId==="top-view"?"top-foil-handles":kind==="front"?"front-handles":"foil-handles";document.querySelector(`#${groupId} [data-seg="${si}"][data-cp="${cp}"]`)?.focus();});e.preventDefault();return;
   }
   if(selectedPoint){nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);e.preventDefault();}
  });
