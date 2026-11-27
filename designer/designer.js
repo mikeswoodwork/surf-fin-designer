@@ -82,7 +82,7 @@ function drawOutlineHandles(){
 }
 function bindOutlineEditor(){
  const svg=$("side-view");
- svg.addEventListener("pointerdown",e=>{const handle=e.target.closest(".outline-handle");if(!handle)return;e.preventDefault();dragPoint={edge:handle.dataset.edge,i:Number(handle.dataset.index),pointerId:e.pointerId};selectedPoint={edge:dragPoint.edge,i:dragPoint.i};svg.setPointerCapture(e.pointerId);drawOutlineHandles();});
+ svg.addEventListener("pointerdown",e=>{const handle=e.target.closest(".outline-handle,.tangent-handle");if(!handle)return;e.preventDefault();dragPoint={edge:handle.dataset.edge,i:Number(handle.dataset.index),pointerId:e.pointerId,mode:handle.classList.contains("tangent-handle")?"tangent":"point"};selectedPoint={edge:dragPoint.edge,i:dragPoint.i};svg.setPointerCapture(e.pointerId);drawOutlineHandles();});
  svg.addEventListener("pointermove",e=>{
   if(!dragPoint||dragPoint.pointerId!==e.pointerId)return;
   const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
