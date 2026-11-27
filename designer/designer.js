@@ -66,7 +66,7 @@ function edgeX(points,y){
  return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
-function outlineAt(v){const p=getOutlinePoints(),y=Math.max(0,Math.min(1,v))*state.height;return [edgeX(p.lead,y),edgeX(p.trail,y)];}
+function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead),targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
 function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const y=state.height*i/n;p.push([edgeX(getOutlinePoints().lead,y),y]);}for(let i=n;i>=0;i--){const y=state.height*i/n;p.push([edgeX(getOutlinePoints().trail,y),y]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
@@ -78,7 +78,7 @@ function drawOutlineHandles(){
  const group=$("outline-handles");if(!group)return;const p=getOutlinePoints(),map=outlineViewMap();
  const items=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))];
  group.innerHTML=items.map(({edge,i,q})=>{const [x,y]=map.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?8:7)+'"/>';}).join("");
- const tg=$("tangent-handles");if(tg)tg.innerHTML=items.map(({edge,i,q})=>{const m=pointSlope(p[edge],i),a=map.toSvg(q),b=map.toSvg([q[0]+m*12,q[1]+12]),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"/><circle class="tangent-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+b[0]+'" cy="'+b[1]+'" r="5"/>';}).join("");
+ const tg=$("tangent-handles");if(tg){const chosen=selectedPoint?items.filter(q=>q.edge===selectedPoint.edge&&q.i===selectedPoint.i):[];tg.innerHTML=chosen.map(({edge,i,q})=>{const m=pointSlope(p[edge],i),a=map.toSvg(q),b=map.toSvg([q[0]+m*12,q[1]+12]);return '<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"/><circle class="tangent-handle" data-edge="'+edge+'" data-index="'+i+'" cx="'+b[0]+'" cy="'+b[1]+'" r="5"/>';}).join("");}
 }
 function bindOutlineEditor(){
  const svg=$("side-view");
