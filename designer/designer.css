@@ -31,3 +31,5 @@
 .base-position-card{margin:16px 0;padding:13px;background:#14232c;border:1px solid var(--line);border-radius:8px}.base-position-card>strong{font-size:12px;color:var(--accent)}.base-position-card p{font-size:10px;line-height:1.5;color:var(--muted)}.base-position-card button{width:100%;cursor:pointer}.base-position-card label{display:flex;justify-content:space-between;gap:10px;margin-top:14px;font-size:10px;color:#dce3e1}.base-position-card output{color:var(--accent);font-variant-numeric:tabular-nums}.base-position-card input{width:100%;margin-top:9px;accent-color:var(--accent)}.base-position-ends{display:flex;justify-content:space-between;font-size:9px;color:var(--muted)}#base-position-controls[hidden]{display:none}
 
 .project-load{display:block;margin-top:12px;font-size:10px;color:var(--muted)}.project-load input{display:block;width:100%;margin-top:7px;font-size:10px;color:var(--muted)}
+
+.workflow-hint{margin:0;padding:10px 16px;background:#14232c;border-bottom:1px solid var(--line);font-size:10px;line-height:1.5;color:var(--muted)}
