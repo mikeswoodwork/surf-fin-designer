@@ -314,7 +314,7 @@ function bindOutlineEditor(){
 async function importOutline(file){
  const source=await file.text(),doc=new DOMParser().parseFromString(source,"image/svg+xml");
  if(doc.querySelector("parsererror"))throw new Error("Die SVG-Datei ist fehlerhaft.");
- const nodes=[...doc.querySelectorAll("path,polygon,polyline")];if(!nodes.length)throw new Error("Keine SVG-Kontur gefunden (path, polygon oder polyline).");
+ const nodes=[...doc.querySelectorAll("path,polygon,polyline")];if(!nodes.length)throw new Error("Keine SVG-Kontur gefunden (path, polygon oder polyline).");if(nodes.length>1)throw new Error("Bitte eine einzelne geschlossene Finnenkontur importieren. Hilfs- und Maßlinien vorher aus der SVG entfernen.");
  let pts=[];
  for(const node of nodes){
   if(node.tagName.toLowerCase()==="path"){
@@ -332,7 +332,7 @@ async function importOutline(file){
  const area=normalized.reduce((a,p,i)=>{const q=normalized[(i+1)%normalized.length];return a+p[0]*q[1]-q[0]*p[1];},0);
  if(Math.abs(area)<.01)throw new Error("Die importierte Kontur ist nicht geschlossen oder hat keine Fläche.");
  const normalizedOutline=normalized;const aspect=(maxX-minX)/(maxY-minY);const lead=[],trail=[];
- for(let k=0;k<=6;k++){const v=k/6,y=v;const hits=[];for(let i=0;i<normalizedOutline.length;i++){const a=normalizedOutline[i],b=normalizedOutline[(i+1)%normalizedOutline.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){const t=(y-a[1])/(b[1]-a[1]);hits.push(a[0]+t*(b[0]-a[0]));}}hits.sort((a,b)=>a-b);if(hits.length>=2){lead.push([hits[0]*state.height*aspect,v*state.height]);trail.push([hits[hits.length-1]*state.height*aspect,v*state.height]);}}
+ for(let k=0;k<=6;k++){const v=k/6,y=k===0?1e-7:k===6?1-1e-7:v;const hits=[];for(let i=0;i<normalizedOutline.length;i++){const a=normalizedOutline[i],b=normalizedOutline[(i+1)%normalizedOutline.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){const t=(y-a[1])/(b[1]-a[1]);hits.push(a[0]+t*(b[0]-a[0]));}}hits.sort((a,b)=>a-b);if(hits.length>=2){lead.push([hits[0]*state.height*aspect,v*state.height]);trail.push([hits[hits.length-1]*state.height*aspect,v*state.height]);}}
  if(lead.length<3)throw new Error("Die SVG-Kontur muss eine geschlossene Finnen-Seitenkontur sein.");
  outlinePoints={lead,trail};importedOutline=null;importedAspect=1;state.template="custom";$("template").value="custom";update();
  $("outline-status").textContent=file.name+" · "+pts.length+" Stützpunkte · importiert";
