@@ -37,3 +37,6 @@
 #fin-type-field[hidden]{display:none!important}
 
 #fin-type-field[hidden],#template-field[hidden]{display:none!important}
+
+#template-field [hidden]{display:none!important}
+.template-fixed{display:block;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:#101d24;color:var(--text);font-size:12px;line-height:1.4}
