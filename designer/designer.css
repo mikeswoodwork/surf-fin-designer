@@ -11,3 +11,11 @@
 .outline-editor{margin:14px 0;padding:12px;background:#14232c;border:1px solid var(--line);border-radius:8px}.editor-actions{display:flex;gap:8px;margin-bottom:8px}.editor-actions button{cursor:pointer}.outline-editor small{font-size:9px;line-height:1.5;color:var(--muted)}.outline-handle{fill:#f0d4b1;stroke:#14232c;stroke-width:1.5;cursor:grab;vector-effect:non-scaling-stroke;touch-action:none}.outline-handle.selected{fill:#e8a45e;stroke:#fff;stroke-width:2.5}.outline-handle:active{cursor:grabbing}#side-view{touch-action:none}
 
 .tangent-line{stroke:#e8a45e;stroke-width:1.4;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;pointer-events:none}.tangent-handle{fill:#e8a45e;stroke:#fff;stroke-width:1.2;cursor:crosshair;vector-effect:non-scaling-stroke;touch-action:none}.tangent-handle.selected{fill:#fff;stroke:#e8a45e;stroke-width:2.5}
+
+/* Interactive cubic Bezier editor */
+.outline-editor>strong{display:block;font-size:12px;color:var(--accent);margin-bottom:7px}
+.outline-editor>small{display:block}
+.tangent-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.tangent-fields label{display:block;font-size:10px;color:#dce3e1}
+.tangent-fields input{display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:8px 9px;background:#101b24;border:1px solid var(--line);border-radius:5px;color:#f0d4b1;font:inherit;font-size:12px}
+#tangent-controls>small{display:block;margin-top:10px}
