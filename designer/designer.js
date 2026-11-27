@@ -64,7 +64,7 @@ function roundedRectShape(length,width,radius){
 }
 function makeFootprintMesh(shape,height,xOffset,yOffset=0,zOffset=0,bevel=.15){
  const g=new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.15,bevel),curveSegments:20});
- g.translate(0,0,-height/2);
+ g.translate(0,0,-height);
  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
  m.position.set(xOffset,yOffset,zOffset);return m;
 }
@@ -114,7 +114,8 @@ function makeUsBoxBase(xOffset){
  s.lineTo(170,-8.2);s.lineTo(164,-16.4);s.lineTo(11,-16.4);
  s.lineTo(5,-8.2);s.lineTo(0,-4.5);s.closePath();
  const g=new THREE.ExtrudeGeometry(s,{depth:W,bevelEnabled:false,steps:1,curveSegments:16});
- g.translate(0,0,-W/2);
+ g.rotateX(Math.PI/2);
+ g.translate(0,W/2,0);
  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
  mesh.position.set(xOffset,0,0);return mesh;
 }
