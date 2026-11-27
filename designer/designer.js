@@ -3,16 +3,16 @@ import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/exampl
 const $=id=>document.getElementById(id);
 const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:38,cant:6,concavity:0},side:{height:125,base:112,tip:48,sweep:34,thickness:9,foilPos:40,cant:6,concavity:0}};
 let importedOutline=null,importedAspect=1,outlinePoints=null,selectedPoint=null,dragPoint=null;
-const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="center"?"center":"side";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
-let state={finType:initialFin,template:params.get("template")|| (initialSetup==="single"?"fin7":initialSetup==="twin"?"fin25":"fin37"),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
+const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="center"?"center":"side";const allowedSetups=["thruster","single","twin","quad"];const initialSetup=allowedSetups.includes(params.get("setup"))?params.get("setup"):"thruster";const systemParam=params.get("system");const initialBox=systemParam==="us-box"||systemParam==="usbox"?"usbox":systemParam==="fcs1"?"fcs1":"futures";const templateAliases={keel:"fin25",hpsb:"fin37",upright:"fin37"};const requestedTemplate=params.get("template");const initialTemplate=templateAliases[requestedTemplate]||(["fin37","fin25","fin7","fin15","custom"].includes(requestedTemplate)?requestedTemplate:(initialSetup==="single"?"fin7":initialSetup==="twin"?"fin25":"fin37"));
+let state={finType:initialFin,template:initialTemplate,foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
 const definitions=[["height","Height",60,300,1],["base","Root chord",55,240,1],["tip","Tip chord",0,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"){const old=state.height,scale=next/old;if(outlinePoints)for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});if(frontSpline)frontSpline.forEach(seg=>seg.forEach(p=>p[1]*=scale));}if(id==="thickness"&&frontSpline){const scale=next/state.thickness;frontSpline.forEach(seg=>seg.forEach(p=>p[0]*=scale));}state[id]=next;update();});});}
-function templateValues(){frontSpline=null;const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9996,base:191.9363,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){frontSpline=null;const values={fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9996,base:191.9363,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
-$("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;frontSpline=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
+$("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template="fin37";outlinePoints=null;frontSpline=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
 $("setup").addEventListener("change",e=>{state.setup=e.target.value;const next=state.setup==="single"?"fin7":state.setup==="twin"?"fin25":"fin37";state.template=next;$("template").value=next;outlinePoints=null;selectedPoint=null;templateValues();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
@@ -208,13 +208,18 @@ function splineIntersections(y){
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
 function outlineAt(v){
- const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,hits=splineIntersections(y);
- if(hits.length===0)return [0,0];
+ const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height;
+ if(p.lead?.length&&p.trail?.length){
+  const sample=edge=>{const target=y;let i=edge.findIndex(q=>q[1]>=target);if(i===0)return edge[0][0];if(i<0)return edge[edge.length-1][0];const a=edge[i-1],b=edge[i],d=b[1]-a[1];return d?a[0]+(b[0]-a[0])*(target-a[1])/d:a[0];};
+  const offset=state.sweep*t;return [sample(p.lead)+offset,sample(p.trail)+offset];
+ }
+ const hits=splineIntersections(y);if(hits.length===0)return [0,0];
  const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/s.base;
  if(hits.length===1){const x=hits[0]*scale+sweepOffset(y,s);return [x,x];}
  const left=hits[0]*scale,right=hits[hits.length-1]*scale;
- const sourceH=s.height,scaledY=y/sourceH;
- return [left+state.sweep*scaledY,right+state.sweep*scaledY];
+ const tipHits=splineIntersections(state.height-1e-5),sourceTipWidth=tipHits.length>1?(tipHits[tipHits.length-1]-tipHits[0])*scale:0;
+ const tipCorrection=(state.tip-sourceTipWidth)*t*.5,shift=state.sweep*(y/s.height);
+ return [left+shift-tipCorrection,right+shift+tipCorrection];
 }
 function sweepOffset(y,s){return state.sweep*(y/s.height);}
 function pointSlope(points,k){return 0;}
