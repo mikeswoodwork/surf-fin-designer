@@ -66,7 +66,7 @@ function makeFootprintMesh(shape,thickness,xOffset,depthOffset=0,zOffset=0,bevel
  // x = chord, y = insertion depth, extrusion z = foil thickness.
  // Map to fin-local coordinates (x, thickness, span): (x,y,z)->(x,z,-y).
  const g=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.15,bevel),curveSegments:20});
- g.rotateX(-Math.PI/2);g.translate(0,-thickness/2,0);
+ g.rotateX(-Math.PI/2);g.translate(0,-thickness/2,1.2);
  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
  m.position.set(xOffset,0,zOffset);return m;
 }
@@ -102,15 +102,20 @@ function makeUsBoxBase(xOffset){
 }
 function updateFinBase(){
  if(!scene||!finMesh)return;
- if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
+ if(finBaseGroup){
+  finMesh.remove(finBaseGroup);
+  finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});
+ }
+ // Critical: bases are children of the fin mesh. They inherit its exact
+ // transform instead of reconstructing a parallel transform independently.
  finBaseGroup=new THREE.Group();
  const position=Math.max(0,Math.min(100,state.basePosition??50))/100;
  const root=outlineAt(0),rootMin=Math.min(...root),rootMax=Math.max(...root);
- finMesh.geometry.computeBoundingBox();const bb=finMesh.geometry.boundingBox,meshCenterX=(bb.min.x+bb.max.x)/2;
+ finMesh.geometry.computeBoundingBox();
+ const bb=finMesh.geometry.boundingBox,meshCenterX=(bb.min.x+bb.max.x)/2;
  const rootStart=rootMin-meshCenterX,rootEnd=rootMax-meshCenterX,rootLength=rootEnd-rootStart;
- finBaseGroup.position.copy(finMesh.position);finBaseGroup.rotation.copy(finMesh.rotation);
  const rp=profile(.5,frontThicknessAt(0));
- finBaseGroup.position.add(new THREE.Vector3(0,-(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
+ finBaseGroup.position.set(0,-(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0);
  if(state.box==="futures"){
   const L=113.5,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-L);
   finBaseGroup.add(makeFuturesBase(center-L/2));
@@ -119,11 +124,12 @@ function updateFinBase(){
   finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
   finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
  }else if(state.box==="usbox"){
-  const L=96.5,usable=Math.min(L,rootLength),center=rootStart+usable/2+(rootLength-usable)*position;
-  finBaseGroup.add(makeUsBoxBase(center-usable/2));
- }else{scene.add(finBaseGroup);return;}
+  const L=96.5,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-L);
+  finBaseGroup.add(makeUsBoxBase(center-L/2));
+ }else{finMesh.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
- datum.position.set((rootStart+rootEnd)/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);scene.add(finBaseGroup);
+ datum.position.set((rootStart+rootEnd)/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);
+ finMesh.add(finBaseGroup);
 }
 // Exact cubic Bezier segments extracted from the supplied Blending Curves PDFs.
 // Coordinates are millimetres in a local frame: root chord on y=0, span on +y.
@@ -337,7 +343,7 @@ function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forE
 document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportSTL(){
- const meshes=[finMesh,...(finBaseGroup?[finBaseGroup]:[])],triangles=[];
+ const meshes=[finMesh],triangles=[];
  meshes.forEach(root=>{
   root.updateMatrixWorld(true);
   root.traverse(obj=>{
