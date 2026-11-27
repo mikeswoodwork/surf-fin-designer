@@ -10,7 +10,7 @@ const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8,tip:0,sweep:0},fin25:{height:127,base:191.9,tip:0,sweep:0},fin7:{height:254,base:183.8,tip:0,sweep:0},fin15:{height:254,base:180.8,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:127,base:191.9368,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -24,7 +24,7 @@ function resize(){if(!renderer)return;const w=$("viewport").clientWidth,h=$("vie
 function animate(){requestAnimationFrame(animate);controls?.update();renderer?.render(scene,camera);}
 function profile(x,totalThickness){const u=Math.max(0,Math.min(1,x));const peak=Math.max(.2,Math.min(.8,(state.foilPos||38)/100));let shape;shape=Math.pow(Math.max(0,u/peak),.5)*Math.pow(Math.max(0,(1-u)/(1-peak)),.7);const half=totalThickness*.5*shape;if(state.foilType==="symmetric")return {top:half,bottom:-half};if(state.foilType==="flat")return {top:totalThickness*shape,bottom:0};const conc=(state.concavity||0)*Math.sin(Math.PI*u);return {top:totalThickness*.9*shape,bottom:-conc};}
 function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();finMesh.material.dispose();}
- const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=48,chordSteps=36,verts=[],indices=[];
+ const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=1000,chordSteps=36,verts=[],indices=[];
  // Two foil surfaces; z is span, x is chord, y is thickness.
  for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,edges=outlineAt(v),leading=edges[0],chord=edges[1]-edges[0];for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.pow(Math.max(0,1-v),.85);const maxT=th*taper;const f=profile(u,maxT);const foilY=(side===0?f.top:f.bottom);const cantShift=state.finType==="side"?z*Math.tan((state.cant||0)*Math.PI/180):0;const y=foilY+cantShift;verts.push(x,y,z);}}}
  const row=chordSteps+1,layer=(segments+1)*row;
@@ -96,7 +96,7 @@ function outlineAt(v){
 }
 function pointSlope(points,k){return 0;}
 function edgeX(points,y){return 0;}
-function outline(){const p=[],n=500;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
+function outline(){const p=[],n=2500;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
  const scale=Math.min(290/Math.max(1,maxX-minX),330/Math.max(1,maxY-minY));
