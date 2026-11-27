@@ -22,3 +22,5 @@
 
 /* Editable front thickness and foil spline controls */
 #front-view,#foil-svg{touch-action:none}.foil-preview svg{overflow:visible}.foil-preview .tangent-line{stroke:#e8a45e;stroke-dasharray:3 2}.foil-preview .outline-handle,.view-card .outline-handle{fill:#f0d4b1;stroke:#14232c;stroke-width:1.5;cursor:grab;touch-action:none}.foil-preview .tangent-handle,.view-card .tangent-handle{fill:#e8a45e;stroke:#fff;stroke-width:1;cursor:crosshair;touch-action:none}.foil-preview .selected,.view-card .selected{stroke:#fff;stroke-width:2.5}
+
+#foil-path{fill:#c58d5b;fill-opacity:.7;stroke:#f0d4b1;stroke-width:1.5;vector-effect:non-scaling-stroke}
