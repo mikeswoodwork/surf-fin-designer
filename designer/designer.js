@@ -13,11 +13,14 @@ function saveDesign(){try{const all=JSON.parse(localStorage.getItem(DESIGN_STORA
 function restoreDesign(setup,finType){try{const all=JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)||"{}"),saved=all[designKey(setup,finType)];if(!saved)return false;state={...state,...saved.state,setup,finType};outlinePoints=cloneData(saved.outlinePoints)||null;foilSpline=cloneData(saved.foilSpline)||foilSpline;frontSpline=cloneData(saved.frontSpline)??null;importedOutline=cloneData(saved.importedOutline)||null;importedAspect=Number(saved.importedAspect)||1;return true;}catch(err){console.warn("FINLAB: gespeicherter Entwurf konnte nicht geladen werden",err);return false;}}
 function prepareSetupEntry(setup){try{const all=JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)||"{}");if(all._activeSetup&&all._activeSetup!==setup)localStorage.removeItem(DESIGN_STORAGE_KEY);}catch(err){console.warn("FINLAB: Setup-Speicher konnte nicht geprüft werden",err);}}
 function setFinTypeVisibility(){
- const finWrap=$("fin-type-field"),templateWrap=$("template-field");
+ const finWrap=$("fin-type-field"),templateSelect=$("template"),templateFixed=$("template-fixed");
+ const isSingle=state.setup==="single";
  if(finWrap)finWrap.hidden=state.setup!=="thruster";
- if(templateWrap)templateWrap.hidden=state.setup!=="single";
- const template=$("template");
- if(template)Array.from(template.options).forEach(o=>{o.hidden=state.setup==="single"?!["fin7","fin15"].includes(o.value):o.value!=="fin37";});
+ if(templateSelect)templateSelect.hidden=!isSingle;
+ if(templateFixed){
+  templateFixed.hidden=isSingle;
+  templateFixed.textContent=state.setup==="thruster"?"Fin 37 · Thruster":state.setup==="quad"?"Fin 37 · Quad":"Fin 25 · Keel";
+ }
 }
 function enforceSetupRules(){
  if(state.setup==="thruster"){if(!["side","center"].includes(state.finType))state.finType="side";state.template="fin37";state.foilType=state.finType==="center"?"symmetric":"flat";}
