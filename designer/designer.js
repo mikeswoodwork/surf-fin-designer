@@ -22,7 +22,16 @@ function field([id,label,min,max,step]){return `<div class="range-field"><div><l
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"){const old=state.height,scale=next/old;if(outlinePoints){if(outlinePoints.segments)outlinePoints.segments.forEach(seg=>seg.forEach(p=>p[1]*=scale));for(const edge of ["lead","trail"])outlinePoints[edge]?.forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});outlinePoints.height=next;}if(frontSpline)frontSpline.forEach(seg=>seg.forEach(p=>p[1]*=scale));}if(id==="thickness"&&frontSpline){const scale=next/state.thickness;frontSpline.forEach(seg=>seg.forEach(p=>p[0]*=scale));}state[id]=next;update();});});}
 function templateValues(){frontSpline=null;const values={fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9996,base:191.9363,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
-$("finType").addEventListener("change",e=>{saveDesign();const next=e.target.value;if(next===state.finType)return;if(!restoreDesign(state.setup,next)){state.finType=next;state.template=next==="center"?"fin7":(state.setup==="twin"?"fin25":"fin37");Object.assign(state,presets[next]);state.foilType=next==="center"?"symmetric":"flat";outlinePoints=null;frontSpline=null;importedOutline=null;importedAspect=1;selectedPoint=null;templateValues();}restoreControlsFromState();update();});
+$("finType").addEventListener("change",e=>{
+ const next=e.target.value;if(next===state.finType)return;
+ saveDesign();
+ let savedFoil=null;
+ try{const all=JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)||"{}");savedFoil=all[designKey(state.setup,next)]?.foilSpline||null;}catch(err){console.warn("FINLAB: Foil-Zwischenstand konnte nicht geladen werden",err);}
+ state.finType=next;
+ state.foilType=next==="center"?"symmetric":"flat";
+ if(savedFoil)foilSpline=cloneData(savedFoil);
+ restoreControlsFromState();update();
+});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
 $("setup").addEventListener("change",e=>{if(e.target.value===state.setup)return;saveDesign();startFreshSetup(e.target.value);restoreControlsFromState();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
@@ -267,7 +276,7 @@ function drawOutlineHandles(){
    if(pi===0&&si>0)return;
    const [x,y]=map.toSvg(p),active=selectedPoint?.seg===si&&selectedPoint?.cp===pi;
    const anchor=pi===0||pi===3;
-   els.push('<circle class="'+(anchor?'outline-handle':'tangent-handle')+(active?' selected':'')+'" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(anchor?(active?7:5):(active?6:4))+'"/>');
+   els.push('<circle class="'+(anchor?'outline-handle':'tangent-handle')+(active?' selected':'')+'" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(anchor?(active?7:5):(active?6:4))+'" tabindex="0" role="button" aria-label="'+(anchor?"Ankerpunkt":"Tangentenpunkt")+' '+(si+1)+'"/>');
   });
  });
  group.innerHTML=els.filter(s=>s.includes('outline-handle')).join("");
@@ -292,6 +301,30 @@ function applyTangentFields(){
  update();
 }
 function bindProfileEditors(){document.querySelectorAll("#front-view,#foil-svg,#top-view").forEach(svg=>{svg.addEventListener("pointerdown",e=>{const h=e.target.closest("[data-kind]");if(!h)return;e.preventDefault();const kind=h.dataset.kind,selection={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};if(kind==="front"){frontSelection=selection;frontDrag={...selection,pointerId:e.pointerId};}else{foilSelection=selection;foilDrag={...selection,pointerId:e.pointerId};}svg.setPointerCapture(e.pointerId);updateTechnicalViews();});svg.addEventListener("pointermove",e=>{const kind=svg.id==="front-view"?"front":"foil",drag=kind==="front"?frontDrag:foilDrag;if(!drag||drag.pointerId!==e.pointerId)return;const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=kind==="front"?frontMap():(svg.id==="top-view"?topFoilMap():foilMap()),p=map.toModel([local.x,local.y]),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[drag.seg],cp=drag.cp;if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.2,p[0]));p[1]=Math.max(0,Math.min(state.height,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}const dx=p[0]-seg[cp][0],dy=p[1]-seg[cp][1];seg[cp]=p;if(cp===0){seg[1]=[seg[1][0]+dx,seg[1][1]+dy];if(drag.seg>0){segs[drag.seg-1][3]=p;segs[drag.seg-1][2]=[segs[drag.seg-1][2][0]+dx,segs[drag.seg-1][2][1]+dy];}}if(cp===3){seg[2]=[seg[2][0]+dx,seg[2][1]+dy];if(drag.seg<segs.length-1){segs[drag.seg+1][0]=p;segs[drag.seg+1][1]=[segs[drag.seg+1][1][0]+dx,segs[drag.seg+1][1]+dy];}}updateTechnicalViews();updateFoil();});const end=e=>{if(frontDrag?.pointerId===e.pointerId){frontDrag=null;update();}if(foilDrag?.pointerId===e.pointerId){foilDrag=null;update();}};svg.addEventListener("pointerup",end);svg.addEventListener("pointercancel",end);});}
+function nudgeOutlinePoint(segIndex,cp,dx,dy){
+ const segs=getOutlinePoints().segments,seg=segs[segIndex];if(!seg)return;
+ const p=[seg[cp][0]+dx,seg[cp][1]+dy];
+ if(cp===0||cp===3){p[1]=Math.max(0,Math.min(state.height,p[1]));syncBezierJoin(segIndex,cp,p);}else seg[cp]=p;
+ selectedPoint={seg:segIndex,cp};update();
+}
+function bindPointKeyboard(){
+ document.addEventListener("keydown",e=>{
+  if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;
+  const tag=e.target?.tagName?.toLowerCase();if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
+  const focused=e.target?.matches?.("[data-kind][data-seg][data-cp]")?e.target:null;
+  const step=e.altKey?.01:e.shiftKey?1:.1,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
+  if(focused?.dataset.kind==="front"||focused?.dataset.kind==="foil"){
+   const kind=focused.dataset.kind,si=Number(focused.dataset.seg),cp=Number(focused.dataset.cp),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si];if(!seg)return;
+   const scale=kind==="foil"?.005:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
+   if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.2,p[0]));p[1]=Math.max(0,Math.min(state.height,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}
+   const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
+   if(cp===0){seg[1]=[seg[1][0]+ox,seg[1][1]+oy];if(si>0){segs[si-1][3]=p;segs[si-1][2]=[segs[si-1][2][0]+ox,segs[si-1][2][1]+oy];}}
+   if(cp===3){seg[2]=[seg[2][0]+ox,seg[2][1]+oy];if(si<segs.length-1){segs[si+1][0]=p;segs[si+1][1]=[segs[si+1][1][0]+ox,segs[si+1][1][1]+oy];}}
+   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};update();e.preventDefault();return;
+  }
+  if(selectedPoint){nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);e.preventDefault();}
+ });
+}
 function bindOutlineEditor(){
  const svg=$("side-view");
  svg.addEventListener("pointerdown",e=>{
@@ -358,7 +391,7 @@ function renderBezierHandles(svgId,groupId,tangentId,segs,map,selection,kind){
   seg.forEach((p,pi)=>{
    if(pi===0&&si>0)return;
    const q=map.toSvg(p),active=selection?.seg===si&&selection?.cp===pi,anchor=pi===0||pi===3;
-   const el=make("circle",{class:(anchor?"outline-handle":"tangent-handle")+(active?" selected":""),"data-kind":kind,"data-seg":si,"data-cp":pi,cx:q[0],cy:q[1],r:anchor?7:6,fill:anchor?"#fff1dc":"#ffad55",stroke:"#172630","stroke-width":2,"vector-effect":"non-scaling-stroke","pointer-events":"all"});
+   const el=make("circle",{class:(anchor?"outline-handle":"tangent-handle")+(active?" selected":""),"data-kind":kind,"data-seg":si,"data-cp":pi,cx:q[0],cy:q[1],r:anchor?7:6,fill:anchor?"#fff1dc":"#ffad55",stroke:"#172630","stroke-width":2,"vector-effect":"non-scaling-stroke","pointer-events":"all",tabindex:0,role:"button","aria-label":(anchor?"Ankerpunkt":"Tangentenpunkt")+" "+(si+1)});
    el.style.cursor="grab";el.style.opacity="1";el.style.visibility="visible";
    (anchor?anchors:handles).push(el);
   });
@@ -411,4 +444,4 @@ $("outline-file").addEventListener("change",async e=>{const file=e.target.files[
 $("clear-outline").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;frontSpline=null;$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";update();});
 $("export-stl").addEventListener("click",exportSTL);$("export-svg").addEventListener("click",exportSVG);$("export-dxf").addEventListener("click",exportDXF);$("export-json").addEventListener("click",()=>download("finlab-project.json",new Blob([JSON.stringify({format:"FINLAB_PROJECT",version:1,state,outlinePoints,foilSpline,frontSpline},null,2)],{type:"application/json"})));
 $("reset").addEventListener("click",()=>{importedOutline=null;importedAspect=1;outlinePoints=null;state.basePosition=50;state.baseLateral=0;$("base-position").value=50;$("base-position-out").textContent="50%";$("base-lateral").value=0;$("base-lateral-out").textContent="0.0 mm";$("base-position-controls").hidden=true;$("base-position-toggle").textContent="Position anpassen";$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";const resetTemplate=state.setup==="single"?"fin7":state.setup==="twin"?"fin25":"fin37";Object.assign(state,{...presets[state.finType],template:resetTemplate,foilType:state.finType==="center"?"symmetric":"flat"});frontSpline=null;foilSpline=[[[0,0],[.10,.34],[.22,.86],[.38,1]],[[.38,1],[.58,1],[.84,.28],[1,0]]];frontSelection=null;foilSelection=null;selectedPoint=null;$("template").value=resetTemplate;$("foilType").value=state.foilType;setFinTypeVisibility();syncInputs();update();});
-bindOutlineEditor();bindProfileEditors();prepareSetupEntry(initialSetup);restoreDesign(initialSetup,initialFin);restoreControlsFromState();if(state.template!=="custom"&&!outlinePoints)templateValues();buildControls();init3d();update();
+bindOutlineEditor();bindProfileEditors();bindPointKeyboard();prepareSetupEntry(initialSetup);restoreDesign(initialSetup,initialFin);restoreControlsFromState();if(state.template!=="custom"&&!outlinePoints)templateValues();buildControls();init3d();update();
