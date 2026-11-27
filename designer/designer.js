@@ -29,15 +29,26 @@ function enforceSetupRules(){
  else {state.finType="center";if(!["fin7","fin15"].includes(state.template))state.template="fin7";state.foilType="symmetric";}
  setFinTypeVisibility();
 }
-function startFreshSetup(setup){state.setup=setup;state.finType=setup==="thruster"||setup==="single"?"center":"side";state.template=setup==="single"?"fin7":setup==="twin"?"fin25":"fin37";state.foilType=state.setup==="single"||state.finType==="center"?"symmetric":"flat";Object.assign(state,presets[state.finType]);outlinePoints=null;frontSpline=null;importedOutline=null;importedAspect=1;selectedPoint=null;dragPoint=null;frontSelection=null;frontDrag=null;foilSelection=null;foilDrag=null;state.basePosition=50;state.baseLateral=0;setFinTypeVisibility();$("finType").value=state.finType;$("foilType").value=state.foilType;$("template").value=state.template;$("base-position").value=50;$("base-lateral").value=0;$("base-position-out").textContent="50%";$("base-lateral-out").textContent="0.0 mm";$("base-position-controls").hidden=true;$("base-position-toggle").textContent="Position anpassen";$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";templateValues();try{localStorage.removeItem(DESIGN_STORAGE_KEY);}catch(err){console.warn("FINLAB: Setup-Entwurf konnte nicht zurückgesetzt werden",err);}saveDesign();}
+function startFreshSetup(setup){state.setup=setup;state.finType=setup==="thruster"||setup==="single"?"center":"side";state.template=setup==="single"?"fin7":setup==="twin"?"fin25":"fin37";state.foilType=state.setup==="single"||state.finType==="center"?"symmetric":"flat";Object.assign(state,presets[state.finType]);outlinePoints=null;frontSpline=null;importedOutline=null;importedAspect=1;selectedPoint=null;dragPoint=null;frontSelection=null;frontDrag=null;foilSelection=null;foilDrag=null;state.basePosition=50;state.baseLateral=0;setFinTypeVisibility();$("finType").value=state.finType;$("foilType").value=state.foilType;$("template").value=state.template;$("base-position").value=50;$("base-position-value").value=50;$("base-lateral").value=0;$("base-lateral-value").value=0;$("base-position-out").textContent="50%";$("base-lateral-out").textContent="0.0 mm";$("base-position-controls").hidden=true;$("base-position-toggle").textContent="Position anpassen";$("outline-file").value="";$("outline-status").textContent="Standard-Outline aktiv";templateValues();try{localStorage.removeItem(DESIGN_STORAGE_KEY);}catch(err){console.warn("FINLAB: Setup-Entwurf konnte nicht zurückgesetzt werden",err);}saveDesign();}
 function restoreControlsFromState(){$("finType").value=state.finType;$("setup").value=state.setup;$("box").value=state.box;$("foilType").value=state.foilType;$("template").value=state.template;$("base-position").value=state.basePosition??50;$("base-lateral").value=state.baseLateral??0;$("base-position-out").textContent=(state.basePosition??50)+"%";$("base-lateral-out").textContent=(state.baseLateral??0).toFixed(1)+" mm";setFinTypeVisibility();syncInputs();}
 const definitions=[["height","Height",60,300,1],["base","Root chord",55,240,1],["tip","Tip chord",0,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
-function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
-function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"){const old=state.height,scale=next/old;if(outlinePoints){if(outlinePoints.segments)outlinePoints.segments.forEach(seg=>seg.forEach(p=>p[1]*=scale));for(const edge of ["lead","trail"])outlinePoints[edge]?.forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});outlinePoints.height=next;}if(frontSpline)frontSpline.forEach(seg=>seg.forEach(p=>p[1]*=scale));}if(id==="thickness"&&frontSpline){const scale=next/state.thickness;frontSpline.forEach(seg=>seg.forEach(p=>p[0]*=scale));}state[id]=next;update();});});}
+function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><div class="range-input-row"><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"><input class="value-input" type="number" id="${id}-value" min="${min}" max="${max}" step="${step}" value="${state[id]??0}" aria-label="${label} als Zahlenwert"></div></div>`;}
+let controlFrame=0;
+function applyControlValue(id,value){
+ const def=[...definitions,...foilDefs].find(d=>d[0]===id);if(!def)return;
+ const [,label,min,max]=def;let next=Number(value);if(!Number.isFinite(next))return;next=Math.max(min,Math.min(max,next));
+ const old=Number(state[id]??0);if(next===old)return;
+ if(id==="height"){const scale=next/old;if(outlinePoints){if(outlinePoints.segments)outlinePoints.segments.forEach(seg=>seg.forEach(p=>p[1]*=scale));for(const edge of ["lead","trail"])outlinePoints[edge]?.forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});outlinePoints.height=next;}if(frontSpline)frontSpline.forEach(seg=>seg.forEach(p=>p[1]*=scale));}
+ if(id==="thickness"&&frontSpline){const scale=next/old;frontSpline.forEach(seg=>seg.forEach(p=>p[0]*=scale));}
+ state[id]=next;if($(id))$(id).value=String(next);if($(id+"-value")&&document.activeElement!==$(id+"-value"))$(id+"-value").value=String(next);
+ if($(id+"-out"))$(id+"-out").textContent=next+(id==="cant"?"°":" mm");
+ if(!controlFrame)controlFrame=requestAnimationFrame(()=>{controlFrame=0;update({interactive:true});});
+}
+function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const range=$(id),number=$(id+"-value");if(!range)return;range.addEventListener("input",()=>applyControlValue(id,range.value));range.addEventListener("change",()=>update());if(number){number.addEventListener("input",()=>{if(number.value!=="")applyControlValue(id,number.value);});number.addEventListener("change",()=>{const v=Number(number.value);if(Number.isFinite(v))applyControlValue(id,v);number.value=String(state[id]);update();});}});}
 function templateValues(){frontSpline=null;const values={fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9996,base:191.9363,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
-function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
+function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;if($(id+"-value"))$(id+"-value").value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{
  if(state.setup!=="thruster")return;
  const next=e.target.value;if(next===state.finType)return;
@@ -51,8 +62,10 @@ $("template").addEventListener("change",e=>{if(state.setup!=="single"||!["fin7",
 $("foilType").addEventListener("change",e=>{state.foilType=e.target.value;update();});
 $("setup").addEventListener("change",e=>{if(e.target.value===state.setup)return;saveDesign();startFreshSetup(e.target.value);enforceSetupRules();restoreControlsFromState();$("model-label").textContent=e.target.selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");update();});
 $("box").addEventListener("change",e=>{state.box=e.target.value;updateFinBase();saveDesign();});
-$("base-position").addEventListener("input",e=>{state.basePosition=Number(e.target.value);$("base-position-out").textContent=state.basePosition+"%";updateFinBase();saveDesign();});
-$("base-lateral").addEventListener("input",e=>{state.baseLateral=Number(e.target.value);$("base-lateral-out").textContent=(state.baseLateral>0?"+":"")+state.baseLateral.toFixed(1)+" mm";updateFinBase();saveDesign();});
+function applyBasePosition(v){state.basePosition=Math.max(0,Math.min(100,Number(v)));$("base-position").value=state.basePosition;$("base-position-value").value=state.basePosition;$("base-position-out").textContent=state.basePosition+"%";updateFinBase();}
+$("base-position").addEventListener("input",e=>applyBasePosition(e.target.value));$("base-position").addEventListener("change",()=>update());$("base-position-value").addEventListener("input",e=>{if(e.target.value!=="")applyBasePosition(e.target.value);});$("base-position-value").addEventListener("change",()=>update());
+function applyBaseLateral(v){state.baseLateral=Math.max(-5,Math.min(5,Number(v)));$("base-lateral").value=state.baseLateral;$("base-lateral-value").value=state.baseLateral;$("base-lateral-out").textContent=(state.baseLateral>0?"+":"")+state.baseLateral.toFixed(1)+" mm";updateFinBase();}
+$("base-lateral").addEventListener("input",e=>applyBaseLateral(e.target.value));$("base-lateral").addEventListener("change",()=>update());$("base-lateral-value").addEventListener("input",e=>{if(e.target.value!=="")applyBaseLateral(e.target.value);});$("base-lateral-value").addEventListener("change",()=>update());
 $("base-position-toggle").addEventListener("click",()=>{$("base-position-controls").hidden=!$("base-position-controls").hidden;$("base-position-toggle").textContent=$("base-position-controls").hidden?"Position anpassen":"Position schließen";});
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab,.tab-panel").forEach(n=>n.classList.remove("active"));b.classList.add("active");$("panel-"+b.dataset.tab).classList.add("active");}));
 let scene,camera,renderer,controls,finMesh,finBaseGroup,grid,viewMode="3d";
@@ -76,8 +89,8 @@ function profile(x,totalThickness){const u=Math.max(0,Math.min(1,x)),q=splineVal
 function frontThicknessAt(v){const p=splineValue(getFrontSpline(),v,1,state.height);return Math.max(0,p[0]);}
 
 function disposeMeshTree(root){root.traverse(obj=>{if(obj.geometry)obj.geometry.dispose();if(obj.material){if(Array.isArray(obj.material))obj.material.forEach(m=>m.dispose());else obj.material.dispose();}});}
-function makeFin(){if(finMesh){scene.remove(finMesh);disposeMeshTree(finMesh);}
- const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=1000,chordSteps=36,verts=[],indices=[];
+function makeFin(interactive=false){if(finMesh){scene.remove(finMesh);disposeMeshTree(finMesh);}
+ const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=interactive?180:1000,chordSteps=interactive?18:36,verts=[],indices=[];
  // Two foil surfaces; z is span, x is chord, y is thickness.
  for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,edges=outlineAt(v),leading=edges[0],chord=edges[1]-edges[0];for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.pow(Math.max(0,1-v),.85);const maxT=frontThicknessAt(v);const f=profile(u,maxT);const foilY=(side===0?f.top:f.bottom);const cantShift=state.finType==="side"?z*Math.tan((state.cant||0)*Math.PI/180):0;const y=foilY+cantShift;verts.push(x,y,z);}}}
  const row=chordSteps+1,layer=(segments+1)*row;
@@ -277,9 +290,9 @@ function syncBezierJoin(segIndex,cpIndex,point){
   if(segIndex<segs.length-1){segs[segIndex+1][0]=point;segs[segIndex+1][1]=[segs[segIndex+1][1][0]+dx,segs[segIndex+1][1][1]+dy];}
  }
 }
-function drawOutlineHandles(){
+function drawOutlineHandles(refreshFields=true){
  const group=$("outline-handles"),tg=$("tangent-handles");if(!group||!tg)return;
- const segs=getOutlinePoints().segments,map=outlineViewMap(),els=[],lines=[];
+ const segs=getOutlinePoints().segments,map=outlineViewMap(),els=[],lines=[],anchorHits=[],tangentHits=[];
  if(!Array.isArray(segs)){group.replaceChildren();tg.replaceChildren();selectedPoint=null;updateTangentFields();return;}
  segs.forEach((seg,si)=>{
   [[0,1],[3,2]].forEach(([anchorIndex,handleIndex])=>{
@@ -291,12 +304,13 @@ function drawOutlineHandles(){
    if(pi===0&&si>0)return;
    const [x,y]=map.toSvg(p),active=selectedPoint?.seg===si&&selectedPoint?.cp===pi;
    const anchor=pi===0||pi===3;
+   const hit='<circle class="handle-hit" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="14" tabindex="0" role="button" aria-label="'+(anchor?"Ankerpunkt":"Tangentenpunkt")+(si+1)+'"/>';(anchor?anchorHits:tangentHits).push(hit);
    els.push('<circle class="'+(anchor?'outline-handle':'tangent-handle')+(active?' selected':'')+'" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(anchor?(active?7:5):(active?6:4))+'" tabindex="0" role="button" aria-label="'+(anchor?"Ankerpunkt":"Tangentenpunkt")+' '+(si+1)+'"/>');
   });
  });
- group.innerHTML=els.filter(s=>s.includes('outline-handle')).join("");
- tg.innerHTML=lines.join("")+els.filter(s=>s.includes('tangent-handle')).join("");
- updateTangentFields();
+ group.innerHTML=anchorHits.join("")+els.filter(s=>s.includes('outline-handle')).join("");
+ tg.innerHTML=lines.join("")+tangentHits.join("")+els.filter(s=>s.includes('tangent-handle')).join("");
+ if(refreshFields)updateTangentFields();
 }
 function updateTangentFields(){
  const segs=getOutlinePoints().segments,sel=selectedPoint,wrap=$("tangent-controls");
@@ -305,15 +319,17 @@ function updateTangentFields(){
  const seg=segs[sel.seg],anchor=bezierAnchor(sel.seg,sel.cp),p=seg[sel.cp],dx=p[0]-anchor[0],dy=p[1]-anchor[1];
  const len=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)*180/Math.PI;
  wrap.innerHTML='<div class="tangent-fields"><label>Länge <input id="tangent-length" type="number" min="0" step="0.1" value="'+len.toFixed(2)+'"> mm</label><label>Winkel <input id="tangent-angle" type="number" step="0.1" value="'+angle.toFixed(1)+'"> °</label></div>';
+ $("tangent-length").addEventListener("input",()=>applyTangentFields(true));
+ $("tangent-angle").addEventListener("input",()=>applyTangentFields(true));
  $("tangent-length").addEventListener("change",applyTangentFields);
  $("tangent-angle").addEventListener("change",applyTangentFields);
 }
-function applyTangentFields(){
+function applyTangentFields(interactive=false){
  if(!selectedPoint||selectedPoint.cp===0||selectedPoint.cp===3)return;
  const seg=getOutlinePoints().segments[selectedPoint.seg],anchor=bezierAnchor(selectedPoint.seg,selectedPoint.cp);
  const length=Math.max(0,Number($("tangent-length").value)||0),angle=(Number($("tangent-angle").value)||0)*Math.PI/180;
  seg[selectedPoint.cp]=[anchor[0]+length*Math.cos(angle),anchor[1]+length*Math.sin(angle)];
- update();
+ if(interactive)update({interactive:true});else update();
 }
 function bindProfileEditors(){document.querySelectorAll("#front-view,#foil-svg,#top-view").forEach(svg=>{svg.addEventListener("pointerdown",e=>{const h=e.target.closest("[data-kind]");if(!h)return;e.preventDefault();const kind=h.dataset.kind,selection={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};if(kind==="front"){frontSelection=selection;frontDrag={...selection,pointerId:e.pointerId};}else{foilSelection=selection;foilDrag={...selection,pointerId:e.pointerId};}svg.setPointerCapture(e.pointerId);updateTechnicalViews();});svg.addEventListener("pointermove",e=>{const kind=svg.id==="front-view"?"front":"foil",drag=kind==="front"?frontDrag:foilDrag;if(!drag||drag.pointerId!==e.pointerId)return;const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=kind==="front"?frontMap():(svg.id==="top-view"?topFoilMap():foilMap()),p=map.toModel([local.x,local.y]),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[drag.seg],cp=drag.cp;if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.2,p[0]));p[1]=Math.max(0,Math.min(state.height,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}const dx=p[0]-seg[cp][0],dy=p[1]-seg[cp][1];seg[cp]=p;if(cp===0){seg[1]=[seg[1][0]+dx,seg[1][1]+dy];if(drag.seg>0){segs[drag.seg-1][3]=p;segs[drag.seg-1][2]=[segs[drag.seg-1][2][0]+dx,segs[drag.seg-1][2][1]+dy];}}if(cp===3){seg[2]=[seg[2][0]+dx,seg[2][1]+dy];if(drag.seg<segs.length-1){segs[drag.seg+1][0]=p;segs[drag.seg+1][1]=[segs[drag.seg+1][1][0]+dx,segs[drag.seg+1][1]+dy];}}updateTechnicalViews(true);updateFoil();});const end=e=>{if(frontDrag?.pointerId===e.pointerId){frontDrag=null;update();}if(foilDrag?.pointerId===e.pointerId){foilDrag=null;update();}};svg.addEventListener("pointerup",end);svg.addEventListener("pointercancel",end);});}
 function nudgeOutlinePoint(segIndex,cp,dx,dy){
@@ -335,7 +351,7 @@ function bindPointKeyboard(){
    const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
    if(cp===0){seg[1]=[seg[1][0]+ox,seg[1][1]+oy];if(si>0){segs[si-1][3]=p;segs[si-1][2]=[segs[si-1][2][0]+ox,segs[si-1][2][1]+oy];}}
    if(cp===3){seg[2]=[seg[2][0]+ox,seg[2][1]+oy];if(si<segs.length-1){segs[si+1][0]=p;segs[si+1][1]=[segs[si+1][1][0]+ox,segs[si+1][1][1]+oy];}}
-   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};const svgId=focused.closest("svg")?.id;update();requestAnimationFrame(()=>{const groupId=svgId==="top-view"?"top-foil-handles":kind==="front"?"front-handles":"foil-handles";document.querySelector(`#${groupId} [data-seg="${si}"][data-cp="${cp}"]`)?.focus();});e.preventDefault();return;
+   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};const svgId=focused.closest("svg")?.id;update({interactive:true});requestAnimationFrame(()=>{const groupId=svgId==="top-view"?"top-foil-handles":kind==="front"?"front-handles":"foil-handles";document.querySelector(`#${groupId} [data-seg="${si}"][data-cp="${cp}"]`)?.focus();});e.preventDefault();return;
   }
   if(selectedPoint){nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);e.preventDefault();}
  });
@@ -343,7 +359,7 @@ function bindPointKeyboard(){
 function bindOutlineEditor(){
  const svg=$("side-view");
  svg.addEventListener("pointerdown",e=>{
-  const handle=e.target.closest(".outline-handle,.tangent-handle");if(!handle)return;
+  const handle=e.target.closest(".handle-hit,.outline-handle,.tangent-handle");if(!handle)return;
   e.preventDefault();dragPoint={seg:Number(handle.dataset.seg),cp:Number(handle.dataset.cp),pointerId:e.pointerId};
   selectedPoint={seg:dragPoint.seg,cp:dragPoint.cp};svg.setPointerCapture(e.pointerId);drawOutlineHandles();
  });
@@ -362,7 +378,7 @@ function bindOutlineEditor(){
  svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);
  svg.addEventListener("lostpointercapture",()=>{dragPoint=null;});
  svg.addEventListener("click",e=>{
-  const h=e.target.closest(".outline-handle,.tangent-handle");if(!h)return;
+  const h=e.target.closest(".handle-hit,.outline-handle,.tangent-handle");if(!h)return;
   selectedPoint={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};drawOutlineHandles();
  });
 }
@@ -406,16 +422,16 @@ function renderBezierHandles(svgId,groupId,tangentId,segs,map,selection,kind){
   seg.forEach((p,pi)=>{
    if(pi===0&&si>0)return;
    const q=map.toSvg(p),active=selection?.seg===si&&selection?.cp===pi,anchor=pi===0||pi===3;
-   const el=make("circle",{class:(anchor?"outline-handle":"tangent-handle")+(active?" selected":""),"data-kind":kind,"data-seg":si,"data-cp":pi,cx:q[0],cy:q[1],r:anchor?7:6,fill:anchor?"#fff1dc":"#ffad55",stroke:"#172630","stroke-width":2,"vector-effect":"non-scaling-stroke","pointer-events":"all",tabindex:0,role:"button","aria-label":(anchor?"Ankerpunkt":"Tangentenpunkt")+" "+(si+1)});
+   const hit=make("circle",{class:"handle-hit","data-kind":kind,"data-seg":si,"data-cp":pi,cx:q[0],cy:q[1],r:14,fill:"transparent",stroke:"transparent","pointer-events":"all",tabindex:0,role:"button","aria-label":(anchor?"Ankerpunkt":"Tangentenpunkt")+" "+(si+1)});const el=make("circle",{class:(anchor?"outline-handle":"tangent-handle")+(active?" selected":""),"data-kind":kind,"data-seg":si,"data-cp":pi,cx:q[0],cy:q[1],r:anchor?7:6,fill:anchor?"#fff1dc":"#ffad55",stroke:"#172630","stroke-width":2,"vector-effect":"non-scaling-stroke","pointer-events":"none"});
    el.style.cursor="grab";el.style.opacity="1";el.style.visibility="visible";
-   (anchor?anchors:handles).push(el);
+   (anchor?anchors:handles).push(hit,el);
   });
  });
  g.replaceChildren(...anchors);tg.replaceChildren(...lines,...handles);
 }
-function updateTechnicalViews(){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));drawOutlineHandles();const top=[],tm=topFoilMap(),half=Math.max(.001,state.thickness*.5);for(let i=0;i<=100;i++){const u=i/100,f=profile(u,state.thickness);top.push(tm.toSvg([u,f.top/half]));}for(let i=100;i>=0;i--){const u=i/100,f=profile(u,state.thickness);top.push(tm.toSvg([u,f.bottom/half]));}$("top-view-path").setAttribute("d",top.map((p,i)=>(i?"L":"M")+p[0].toFixed(2)+","+p[1].toFixed(2)).join(" ")+" Z");const front=[];for(let i=0;i<=80;i++){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.top,z]);}for(let i=80;i>=0;i--){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.bottom,z]);}const fm=frontMap();$("front-view-path").setAttribute("d",front.map((p,i)=>{const q=fm.toSvg(p);return (i?"L":"M")+q[0].toFixed(2)+","+q[1].toFixed(2);}).join(" ")+" Z");renderBezierHandles("front-view","front-handles","front-tangents",getFrontSpline(),frontMap(),frontSelection,"front");renderBezierHandles("foil-svg","foil-handles","foil-tangents",foilSpline,foilMap(),foilSelection,"foil");renderBezierHandles("top-view","top-foil-handles","top-foil-tangents",foilSpline,topFoilMap(),foilSelection,"foil");}
+function updateTechnicalViews(interactive=false){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));drawOutlineHandles(!interactive);const top=[],tm=topFoilMap(),half=Math.max(.001,state.thickness*.5);for(let i=0;i<=100;i++){const u=i/100,f=profile(u,state.thickness);top.push(tm.toSvg([u,f.top/half]));}for(let i=100;i>=0;i--){const u=i/100,f=profile(u,state.thickness);top.push(tm.toSvg([u,f.bottom/half]));}$("top-view-path").setAttribute("d",top.map((p,i)=>(i?"L":"M")+p[0].toFixed(2)+","+p[1].toFixed(2)).join(" ")+" Z");const front=[];for(let i=0;i<=80;i++){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.top,z]);}for(let i=80;i>=0;i--){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.bottom,z]);}const fm=frontMap();$("front-view-path").setAttribute("d",front.map((p,i)=>{const q=fm.toSvg(p);return (i?"L":"M")+q[0].toFixed(2)+","+q[1].toFixed(2);}).join(" ")+" Z");renderBezierHandles("front-view","front-handles","front-tangents",getFrontSpline(),frontMap(),frontSelection,"front");renderBezierHandles("foil-svg","foil-handles","foil-tangents",foilSpline,foilMap(),foilSelection,"foil");renderBezierHandles("top-view","top-foil-handles","top-foil-tangents",foilSpline,topFoilMap(),foilSelection,"foil");}
 function updateFoil(){const pts=[],half=Math.max(.001,state.thickness*.5);for(let i=0;i<=100;i++){const f=profile(i/100,state.thickness);pts.push([15+i/100*290,55-f.top/half*34]);}for(let i=100;i>=0;i--){const f=profile(i/100,state.thickness);pts.push([15+i/100*290,55-f.bottom/half*34]);}$("foil-path").setAttribute("d",pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ")+"Z");}
-function update(){if(!outlinePoints?.lead){const tipHits=splineIntersections(state.height-1e-5);sourceTipWidth=tipHits.length>1?(tipHits[tipHits.length-1]-tipHits[0])*(state.base/(sourceSplines[state.template]||sourceSplines.fin37).base):0;}else sourceTipWidth=0;[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("base-position").value=state.basePosition??50;$("base-position-out").textContent=(state.basePosition??50)+"%";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();updateTechnicalViews();saveDesign();}
+function update(options={}){const interactive=!!options.interactive;if(!outlinePoints?.lead){const tipHits=splineIntersections(state.height-1e-5);sourceTipWidth=tipHits.length>1?(tipHits[tipHits.length-1]-tipHits[0])*(state.base/(sourceSplines[state.template]||sourceSplines.fin37).base):0;}else sourceTipWidth=0;[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("base-position").value=state.basePosition??50;if($("base-position-value"))$("base-position-value").value=state.basePosition??50;$("base-position-out").textContent=(state.basePosition??50)+"%";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin(interactive);if(!interactive){metrics();saveDesign();}updateFoil();updateTechnicalViews(interactive);}
 function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===mode));if(mode==="3d"){camera.position.set(220,170,260);controls.enableRotate=true;}else if(mode==="side"){camera.position.set(0,0,420);controls.enableRotate=false;}else{camera.position.set(420,0,0);controls.enableRotate=false;}controls.target.set(0,0,0);controls.update();}
 document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
