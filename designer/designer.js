@@ -94,7 +94,7 @@ function makeFuturesBase(xOffset){
  const bossGeo=new THREE.ExtrudeGeometry(bossShape,{depth:Wf+1.0,bevelEnabled:true,bevelSegments:2,bevelSize:.2,bevelThickness:.15,steps:1});
  bossGeo.translate(0,0,-(Wf+1.0)/2);
  const boss=new THREE.Mesh(bossGeo,new THREE.MeshStandardMaterial({color:0x87979d,roughness:.3,metalness:.12}));
- boss.position.set(xOffset+Lfuture-8.5,-17.7,0);group.add(boss);
+ boss.position.set(xOffset+Lfuture-8.5,0,-17.7);group.add(boss);
  return group;
 }
 const Lfuture=113.5;
