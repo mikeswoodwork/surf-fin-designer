@@ -53,59 +53,93 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;// Local z is the fin span; after rotation it becomes world y.
  finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,-(bounds.min.z+bounds.max.z)/2,0);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
 
-function bezierBaseShape(length,drop,corner=1.5,profile="rounded"){
- const s=new THREE.Shape(),r=Math.max(.5,Math.min(corner,length*.12));
- // Closed cubic contour: rounded nose/tail, flat upper land embedded into the fin root.
- s.moveTo(r,1.2);
- s.bezierCurveTo(r*.25,1.2,r*.15,-drop*.55,r,-drop);
- s.bezierCurveTo(length*.22,-drop*1.02,length*.78,-drop*1.02,length-r,-drop);
- s.bezierCurveTo(length-r*.15,-drop*.55,length-r*.25,1.2,length-r,1.2);
- s.lineTo(r,1.2);
+// Fin-base construction profiles. All dimensions are mm and remain independent
+// from the fin outline. Reference dimensions are taken only from the supplied drawings.
+function roundedRectShape(length,width,radius){
+ const s=new THREE.Shape(),r=Math.max(.2,Math.min(radius,length/2,width/2));
+ s.moveTo(r,0);s.lineTo(length-r,0);s.quadraticCurveTo(length,0,length,r);
+ s.lineTo(length,width-r);s.quadraticCurveTo(length,width,length-r,width);
+ s.lineTo(r,width);s.quadraticCurveTo(0,width,0,width-r);
+ s.lineTo(0,r);s.quadraticCurveTo(0,0,r,0);return s;
+}
+function makeFootprintMesh(shape,height,xOffset,yOffset=0,zOffset=0,bevel=.15){
+ const g=new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.15,bevel),curveSegments:20});
+ g.translate(0,0,-height/2);
+ const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
+ m.position.set(xOffset,yOffset,zOffset);return m;
+}
+function makeFuturesFootprint(){
+ // Side-Fin/Quad-front reference drawing: 113.5 mm base, 17.7 mm width.
+ // The forward end has the measured 4.4 mm round-ended retaining slot;
+ // rear end uses the 10°/6° bevel envelope shown in the drawing.
+ const L=113.5,W=17.7,s=new THREE.Shape();
+ s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L,3.8);s.lineTo(L, W-5.5);
+ s.lineTo(L-3.8,W);s.lineTo(0,W);s.lineTo(0,W*.5+2.2);
+ s.lineTo(3.3,W*.5+2.2);s.absarc(3.3,W*.5,2.2,Math.PI/2,-Math.PI/2,true);
+ s.lineTo(0,W*.5-2.2);s.closePath();
+ const slot=new THREE.Path();slot.absarc(3.3,W*.5,2.2,0,Math.PI*2,true);s.holes.push(slot);
  return s;
 }
-function makeBasePiece(length,drop,thickness,xOffset,zOffset=0,bevel=.25){
- const shape=bezierBaseShape(length,drop,Math.min(2.5,length*.08));
- const geo=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.25,bevel),curveSegments:16});
- geo.translate(0,0,-thickness/2);
- const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.32,metalness:.12}));
- mesh.position.set(xOffset,0,zOffset);return mesh;
+function makeFuturesBase(xOffset){
+ const group=new THREE.Group();
+ // 17.7 mm plan width, 113.5 mm length. 7.7 mm root land based on drawing.
+ const base=makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,-Wf/2,0,.12);
+ group.add(base);
+ // Shallow tapered shoulder at rear end, represented as a separate wedge.
+ const wedgeShape=new THREE.Shape();wedgeShape.moveTo(0,0);wedgeShape.lineTo(10.5,0);wedgeShape.lineTo(10.5,2.1);wedgeShape.lineTo(0,0);wedgeShape.closePath();
+ const wedgeGeo=new THREE.ExtrudeGeometry(wedgeShape,{depth:Wf,bevelEnabled:false,steps:1});
+ wedgeGeo.translate(0,0,-Wf/2);
+ const wedge=new THREE.Mesh(wedgeGeo,new THREE.MeshStandardMaterial({color:0x87979d,roughness:.32}));
+ wedge.position.set(xOffset+103,-3.85,0);group.add(wedge);
+ return group;
+}
+const Wf=17.7;
+function makeFcsTab(xOffset,tabCenter){
+ // FCS G5/G7 drawing specifies 34 mm tab distance. Two independent plug tabs.
+ // The 112/114 mm figures are fin base chord, not the tab's own length.
+ const L=19,W=10.8,r=1.8,s=roundedRectShape(L,W,r);
+ // Small softened retention shoulders on the tab perimeter.
+ const mesh=makeFootprintMesh(s,7.7,xOffset,tabCenter-W/2,0,.12);
+ return mesh;
+}
+function makeUsBoxBase(xOffset){
+ // Supplied US-box drawing: 175 overall length, 9.2 mm top-view width,
+ // 24 mm front-view height envelope, 16.4 mm section depth and 60° internal ramp.
+ const L=175,W=9.2,H=16.4,s=new THREE.Shape();
+ // Side elevation in (length, vertical) coordinates. End shoulders and central
+ // recessed run are traced from the front/section views rather than a capsule.
+ s.moveTo(0,0);s.lineTo(13,0);s.lineTo(22,0);s.lineTo(31,0);
+ s.lineTo(39,-3.2);s.lineTo(46,-7.8);s.lineTo(51,-9.2);
+ s.lineTo(137,-9.2);s.lineTo(145,-7.8);s.lineTo(151,-3.0);
+ s.lineTo(158,0);s.lineTo(175,0);s.lineTo(175,-4.5);
+ s.lineTo(170,-8.2);s.lineTo(164,-16.4);s.lineTo(11,-16.4);
+ s.lineTo(5,-8.2);s.lineTo(0,-4.5);s.closePath();
+ const g=new THREE.ExtrudeGeometry(s,{depth:W,bevelEnabled:false,steps:1,curveSegments:16});
+ g.translate(0,0,-W/2);
+ const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
+ mesh.position.set(xOffset,0,0);return mesh;
 }
 function updateFinBase(){
  if(!scene||!finMesh)return;
  if(finBaseGroup){scene.remove(finBaseGroup);finBaseGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
  finBaseGroup=new THREE.Group();
  const B=state.base,position=Math.max(0,Math.min(100,state.basePosition??50))/100;
- // Position is the base centre along the actual root chord, not its leading edge.
- let length=0,drop=0,thickness=0,centerMin=0,centerMax=B;
- if(state.box==="futures"){length=Math.max(45,B-12);drop=9.5;thickness=6.5;centerMin=length/2;centerMax=B-length/2;}
- else if(state.box==="fcs1"){length=19;drop=8;thickness=3.5;centerMin=B*.30+length/2;centerMax=B-(B*.30+length/2);}
- else if(state.box==="usbox"){length=Math.min(96.5,Math.max(55,B-12));drop=9.2;thickness=9.2;centerMin=length/2;centerMax=B-length/2;}
- const centerX=centerMin+(centerMax-centerMin)*position;
- // Match the fin mesh transform exactly. The fin is rotated -90° around X:
- // local base depth (Y) must follow the fin thickness axis, and extrusion (Z)
- // must run along the fin span. Without this rotation the bases lie in the wrong plane.
  finBaseGroup.position.copy(finMesh.position);
  finBaseGroup.rotation.copy(finMesh.rotation);
  const rootProfile=profile(.5,frontThicknessAt(0));
  finBaseGroup.position.add(new THREE.Vector3(0,-((rootProfile.top+rootProfile.bottom)/2)+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
  if(state.box==="futures"){
-  // Futures single-tab approximation: one continuous tongue with softened ends.
-  finBaseGroup.add(makeBasePiece(length,drop,thickness,centerX-length/2,0,.35));
-  // Small integral engagement shoulder at the rear; no screw or box geometry.
-  const shoulder=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.4,thickness),new THREE.MeshStandardMaterial({color:0xa8b5b8,roughness:.35,metalness:.12}));
-  shoulder.position.set(centerX+length/2-3,-1.0,0);finBaseGroup.add(shoulder);
+  const L=113.5,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
+  const g=makeFuturesBase(center-L/2);
+  g.position.y=0;finBaseGroup.add(g);
  }else if(state.box==="fcs1"){
-  // Classic FCS I: two separate tabs, 34 mm nominal centre spacing.
-  const spacing=34,tabLength=19,tabThickness=3.5,tabDrop=8;
-  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX-spacing/2-tabLength/2,0,.3));
-  finBaseGroup.add(makeBasePiece(tabLength,tabDrop,tabThickness,centerX+spacing/2-tabLength/2,0,.3));
+  const tabL=19,spacing=34,centerMin=spacing/2+tabL/2,centerMax=B-(spacing/2+tabL/2),center=centerMin+(centerMax-centerMin)*position;
+  finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
+  finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
  }else if(state.box==="usbox"){
-  // US longboard fin tongue based on the supplied drawing: 9.2 mm wide,
-  // 9.2 mm drop and 96.5 mm nominal usable length. Pin and screw omitted.
-  finBaseGroup.add(makeBasePiece(length,drop,thickness,centerX-length/2,0,.2));
- }else{
-  scene.add(finBaseGroup);return;
- }
+  const L=175,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
+  finBaseGroup.add(makeUsBoxBase(center-L/2));
+ }else{scene.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
  datum.position.set(B/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);
  scene.add(finBaseGroup);
