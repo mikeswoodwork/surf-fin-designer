@@ -71,22 +71,20 @@ function makeFootprintMesh(shape,thickness,xOffset,depthOffset=0,zOffset=0,bevel
  m.position.set(xOffset,0,zOffset);return m;
 }
 function makeFuturesFootprint(){
+ // Single continuous Futures tongue. Dimensions are a working generic
+ // fin-base envelope, not a certified manufacturer tolerance drawing.
  const L=113.5,D=17.7,r=2.2,s=new THREE.Shape();
- // rear-open Ø4.4 notch at x=0; 3.3 mm centre setback from rear.
- s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L-3.8,.8);s.lineTo(L,2.1);
- s.lineTo(L,D-2.1);s.lineTo(L-3.8,D-.8);s.lineTo(L-10.5,D);s.lineTo(0,D);
- s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,-Math.PI/2,true);s.lineTo(0,D/2-r);s.closePath();return s;
+ // Rounded nose at the forward end; rear end carries the open retaining relief.
+ s.moveTo(r,0);s.lineTo(L-5,0);s.quadraticCurveTo(L,0,L,D/2-2.2);
+ s.lineTo(L,D/2+2.2);s.quadraticCurveTo(L,D,L-5,D);
+ s.lineTo(r,D);s.quadraticCurveTo(0,D,D/2+r,D);
+ s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,-Math.PI/2,true);
+ s.lineTo(0,D/2-r);s.quadraticCurveTo(0,0,r,0);s.closePath();
+ return s;
 }
 function makeFuturesBase(xOffset){
- const g=new THREE.Group();
- // One continuous Futures tongue. Rear-open Ø4.4 relief stays unobstructed.
- g.add(makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,0,0,.12));
- // Opposite-end relief/shoulder represented as a shallow stepped contour.
- const relief=new THREE.Shape();
- relief.moveTo(0,0);relief.lineTo(3.8,0);relief.lineTo(3.8,5.5);
- relief.lineTo(0,4.8);relief.closePath();
- g.add(makeFootprintMesh(relief,7.7,xOffset+109.7,0,0,0));
- return g;
+ // One full-length single tab; the rear relief is part of the same solid.
+ return makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,0,0,.12);
 }
 function makeFcsTab(xOffset,depthCenter){
  const L=19,D=10.8,s=roundedRectShape(L,D,1.8);
@@ -129,7 +127,9 @@ function updateFinBase(){
  // fin mesh local frame. Do not subtract the swept mesh bounding-box centre.
  const rootLength=rootEnd-rootStart;
  const rp=profile(.5,frontThicknessAt(0));
- finBaseGroup.position.set(0,-(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0);
+ // The fin surfaces are defined in the fin-local +Y direction.
+ // The base is centred on the local foil mid-plane (not mirrored below it).
+ finBaseGroup.position.set(0,(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0);
  if(state.box==="futures"){
   const L=113.5,center=rootStart+rootLength/2+(position-.5)*Math.max(0,rootLength-L);
   finBaseGroup.add(makeFuturesBase(center-L/2));
