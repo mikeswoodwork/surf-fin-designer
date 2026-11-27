@@ -78,12 +78,15 @@ function makeFuturesFootprint(){
  s.lineTo(0,D/2+r);s.absarc(0,D/2,r,Math.PI/2,-Math.PI/2,true);s.lineTo(0,D/2-r);s.closePath();return s;
 }
 function makeFuturesBase(xOffset){
- const g=new THREE.Group(),D=17.7;
+ const g=new THREE.Group();
+ // One continuous Futures tongue. Rear-open Ø4.4 relief stays unobstructed.
  g.add(makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,0,0,.12));
- // Screw engagement boss on the rear shoulder, aligned with open end slot.
- const boss=new THREE.Shape();boss.moveTo(0,D/2-3);boss.lineTo(7.5,D/2-3);
- boss.quadraticCurveTo(9,D/2,7.5,D/2+3);boss.lineTo(0,D/2+3);boss.closePath();
- g.add(makeFootprintMesh(boss,9,xOffset,0,0,.12));return g;
+ // Opposite-end relief/shoulder represented as a shallow stepped contour.
+ const relief=new THREE.Shape();
+ relief.moveTo(0,0);relief.lineTo(3.8,0);relief.lineTo(3.8,5.5);
+ relief.lineTo(0,4.8);relief.closePath();
+ g.add(makeFootprintMesh(relief,7.7,xOffset+109.7,0,0,0));
+ return g;
 }
 function makeFcsTab(xOffset,depthCenter){
  const L=19,D=10.8,s=roundedRectShape(L,D,1.8);
