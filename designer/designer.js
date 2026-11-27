@@ -10,7 +10,7 @@ const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9999,base:191.9368,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9996,base:191.9363,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -43,10 +43,10 @@ const sourceSplines={
  [[147.3846,103.7579],[145.524,108.5455],[139.7522,114.3],[125.7,114.3]],
  [[125.7,114.3],[104.9757,114.3],[51.8146,98.9062],[0,0]]
  ]},
- fin25:{height:127,base:191.9368,segments:[
- [[191.9368,0],[191.9368,0],[85.1038,126.9999],[-25.6149,126.9999]],
- [[-25.6149,126.9999],[-55.0002,127],[-70.0747,115.786],[-70.0748,109.8428]],
- [[-70.0748,109.8428],[-70.0748,95.6302],[-5.2327,81.2766],[0,0]]
+ fin25:{height:127,base:191.9363,segments:[
+ [[191.9363,0],[191.9363,0],[85.1036,126.9996],[-25.6148,126.9996]],
+ [[-25.6148,126.9996],[-55.0001,126.9997],[-70.0745,115.7858],[-70.0747,109.8425]],
+ [[-70.0747,109.8425],[-70.0746,95.6299],[-5.2327,81.2764],[0,0]]
  ]},
  fin15:{height:254,base:180.8438,segments:[
  [[180.8438,0],[147.3031,58.7026],[65.9698,254],[-38.5918,254]],
