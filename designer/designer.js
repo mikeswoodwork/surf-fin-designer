@@ -336,9 +336,10 @@ function nudgeOutlinePoint(segIndex,cp,dx,dy){
  const segs=getOutlinePoints().segments,seg=segs[segIndex];if(!seg)return;
  const p=[seg[cp][0]+dx,seg[cp][1]+dy];
  if(cp===0||cp===3){p[1]=Math.max(0,Math.min(state.height,p[1]));syncBezierJoin(segIndex,cp,p);}else seg[cp]=p;
- selectedPoint={seg:segIndex,cp};update();
+ selectedPoint={seg:segIndex,cp};update({interactive:true});saveDesign();
 }
 function bindPointKeyboard(){
+ document.addEventListener("focusin",e=>{const h=e.target?.closest?.(".handle-hit[data-seg][data-cp]:not([data-kind])");if(h){selectedPoint={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};updateTangentFields();}});
  document.addEventListener("keydown",e=>{
   if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;
   const tag=e.target?.tagName?.toLowerCase();if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
@@ -351,7 +352,7 @@ function bindPointKeyboard(){
    const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
    if(cp===0){seg[1]=[seg[1][0]+ox,seg[1][1]+oy];if(si>0){segs[si-1][3]=p;segs[si-1][2]=[segs[si-1][2][0]+ox,segs[si-1][2][1]+oy];}}
    if(cp===3){seg[2]=[seg[2][0]+ox,seg[2][1]+oy];if(si<segs.length-1){segs[si+1][0]=p;segs[si+1][1]=[segs[si+1][1][0]+ox,segs[si+1][1][1]+oy];}}
-   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};const svgId=focused.closest("svg")?.id;update({interactive:true});requestAnimationFrame(()=>{const groupId=svgId==="top-view"?"top-foil-handles":kind==="front"?"front-handles":"foil-handles";document.querySelector(`#${groupId} [data-seg="${si}"][data-cp="${cp}"]`)?.focus();});e.preventDefault();return;
+   if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};const svgId=focused.closest("svg")?.id;update({interactive:true});saveDesign();requestAnimationFrame(()=>{const groupId=svgId==="top-view"?"top-foil-handles":kind==="front"?"front-handles":"foil-handles";document.querySelector(`#${groupId} [data-seg="${si}"][data-cp="${cp}"]`)?.focus();});e.preventDefault();return;
   }
   if(selectedPoint){nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);e.preventDefault();}
  });
