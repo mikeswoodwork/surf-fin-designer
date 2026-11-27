@@ -35,3 +35,5 @@
 .workflow-hint{margin:0;padding:10px 16px;background:#14232c;border-bottom:1px solid var(--line);font-size:10px;line-height:1.5;color:var(--muted)}
 
 #fin-type-field[hidden]{display:none!important}
+
+#fin-type-field[hidden],#template-field[hidden]{display:none!important}
