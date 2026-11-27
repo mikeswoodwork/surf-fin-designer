@@ -81,10 +81,13 @@ function updateFinBase(){
  else if(state.box==="fcs1"){length=19;drop=8;thickness=3.5;centerMin=B*.30+length/2;centerMax=B-(B*.30+length/2);}
  else if(state.box==="usbox"){length=Math.min(96.5,Math.max(55,B-12));drop=9.2;thickness=9.2;centerMin=length/2;centerMax=B-length/2;}
  const centerX=centerMin+(centerMax-centerMin)*position;
- finBaseGroup.position.set(finMesh.position.x,finMesh.position.y,finMesh.position.z);
+ // Match the fin mesh transform exactly. The fin is rotated -90° around X:
+ // local base depth (Y) must follow the fin thickness axis, and extrusion (Z)
+ // must run along the fin span. Without this rotation the bases lie in the wrong plane.
+ finBaseGroup.position.copy(finMesh.position);
+ finBaseGroup.rotation.copy(finMesh.rotation);
  const rootProfile=profile(.5,frontThicknessAt(0));
- finBaseGroup.position.z-=((rootProfile.top+rootProfile.bottom)/2);
- finBaseGroup.position.z+=Number(state.baseLateral||0);
+ finBaseGroup.position.add(new THREE.Vector3(0,-((rootProfile.top+rootProfile.bottom)/2)+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
  if(state.box==="futures"){
   // Futures single-tab approximation: one continuous tongue with softened ends.
   finBaseGroup.add(makeBasePiece(length,drop,thickness,centerX-length/2,0,.35));
