@@ -64,7 +64,10 @@ function roundedRectShape(length,width,radius){
 }
 function makeFootprintMesh(shape,height,xOffset,yOffset=0,zOffset=0,bevel=.15){
  const g=new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:bevel>0,bevelSegments:2,steps:1,bevelSize:bevel,bevelThickness:Math.min(.15,bevel),curveSegments:20});
- g.translate(0,0,-height);
+ // Convert the sketch plane (chord x / insertion depth y) and extrusion
+ // into fin-local axes: insertion follows local span z, thickness follows y.
+ g.rotateX(Math.PI/2);
+ g.translate(0,height/2,0);
  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9cabb0,roughness:.3,metalness:.1}));
  m.position.set(xOffset,yOffset,zOffset);return m;
 }
@@ -72,7 +75,7 @@ function makeFuturesFootprint(){
  // Plan contour from the supplied Side Fin / Quad Front drawing.
  // Leading end is plain; the Ø4.4 retaining relief is placed at the rear,
  // as requested. Overall chord = 113.5 mm, across-fin width = 7.7 mm.
- const L=113.5,W=7.7,s=new THREE.Shape(),r=2.2;
+ const L=113.5,W=17.7,s=new THREE.Shape(),r=2.2;
  s.moveTo(0,0);s.lineTo(L-10.5,0);s.lineTo(L-3.8,0.8);
  s.lineTo(L,2.1);s.lineTo(L,W-2.1);s.lineTo(L-3.8,W-0.8);
  s.lineTo(L-10.5,W);s.lineTo(0,W);
@@ -84,7 +87,7 @@ function makeFuturesFootprint(){
 }
 function makeFuturesBase(xOffset){
  const group=new THREE.Group();
- const base=makeFootprintMesh(makeFuturesFootprint(),17.7,xOffset,-Wf/2,0,.12);
+ const base=makeFootprintMesh(makeFuturesFootprint(),7.7,xOffset,-Wf/2,0,.12);
  group.add(base);
  // Futures grub-screw engagement land: a raised, tapered boss at the rear.
  // The rear-open Ø4.4 relief remains accessible from the end.
@@ -135,15 +138,15 @@ function updateFinBase(){
  finBaseGroup.position.add(new THREE.Vector3(0,-((rootProfile.top+rootProfile.bottom)/2)+Number(state.baseLateral||0),0).applyEuler(finMesh.rotation));
  if(state.box==="futures"){
   const L=113.5,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
-  const g=makeFuturesBase(center-L/2);
+  const g=makeFuturesBase(center-L/2-B/2);
   g.position.y=0;finBaseGroup.add(g);
  }else if(state.box==="fcs1"){
   const tabL=19,spacing=34,centerMin=spacing/2+tabL/2,centerMax=B-(spacing/2+tabL/2),center=centerMin+(centerMax-centerMin)*position;
-  finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2,0));
-  finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2,0));
+  finBaseGroup.add(makeFcsTab(center-spacing/2-tabL/2-B/2,0));
+  finBaseGroup.add(makeFcsTab(center+spacing/2-tabL/2-B/2,0));
  }else if(state.box==="usbox"){
   const L=96.5,centerMin=L/2,centerMax=B-L/2,center=centerMin+(centerMax-centerMin)*position;
-  finBaseGroup.add(makeUsBoxBase(center-L/2));
+  finBaseGroup.add(makeUsBoxBase(center-L/2-B/2));
  }else{scene.add(finBaseGroup);return;}
  const datum=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,12),new THREE.MeshBasicMaterial({color:0xffa45b}));
  datum.position.set(B/2,1.5,0);datum.userData.referenceOnly=true;finBaseGroup.add(datum);
