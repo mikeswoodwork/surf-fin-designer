@@ -48,7 +48,8 @@ function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();
  // close leading/trailing edges and root/tip perimeter
  for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
  for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
- const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,0,-(bounds.min.z+bounds.max.z)/2);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
+ const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;// Local z is the fin span; after rotation it becomes world y.
+ finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,-(bounds.min.z+bounds.max.z)/2,0);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
 
 function bezierBaseShape(length,drop,topInset=0,hole=false){
  const s=new THREE.Shape(),rootOverlap=1.2;
@@ -80,9 +81,9 @@ function updateFinBase(){
  // The fin mesh is translated by its complete outline bounds. Reuse that exact
  // translation and place the base in the unshifted root-chord coordinate system.
  const rootLeading=0,rootTrailing=B,centerX=rootLeading+(rootTrailing-rootLeading)*position;
- finBaseGroup.position.x=finMesh.position.x;
+ finBaseGroup.position.set(finMesh.position.x,finMesh.position.y,finMesh.position.z);
  const rootProfile=profile(.5,frontThicknessAt(0));
- finBaseGroup.position.z=-(rootProfile.top+rootProfile.bottom)/2;
+ finBaseGroup.position.z-=((rootProfile.top+rootProfile.bottom)/2);
  const materialColor=0xa8b5b8;
  if(state.box==="futures"){
   // One continuous full-length tab with a rear engagement shoulder.
