@@ -5,12 +5,12 @@ const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:3
 let importedOutline=null,importedAspect=1,outlinePoints=null,selectedPoint=null,dragPoint=null;
 const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="center"?"center":"side";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
 let state={finType:initialFin,template:params.get("template")|| (initialSetup==="single"?"fin7":initialSetup==="twin"?"fin25":"fin37"),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
-const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",8,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
+const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",0,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:120,base:118,tip:16,sweep:42},fin25:{height:85,base:160,tip:70,sweep:58},fin7:{height:115,base:112,tip:36,sweep:43},fin15:{height:150,base:135,tip:40,sweep:24}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},fin37:{height:114.3,base:110.8,tip:0,sweep:0},fin25:{height:85,base:160,tip:70,sweep:58},fin7:{height:115,base:112,tip:36,sweep:43},fin15:{height:150,base:135,tip:40,sweep:24}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -60,12 +60,11 @@ function defaultOutline(){
   lead:[[0,0],[1,h*.18],[4,h*.42],[9,h*.68],[16,h*.88],[32.5,h]],
   trail:[[112,0],[105,h*.18],[88,h*.42],[65,h*.68],[49,h*.88],[32.5,h]]
  };
- // Digitized from the user's reference image: rounded, swept thruster side-fin.
- // Coordinates are scaled to a 120 mm span. Both edges meet at the rounded tip.
- return {
-  // Five intentional stations per edge: root, lower curve, mid-foil, shoulder, shared tip.
-  lead:[[0,0],[22.3,h*.3225],[53.8,h*.65],[96.4,h*.925],[131.8,h]],
-  trail:[[118,0],[110.8,h*.3225],[126.6,h*.65],[154.8,h*.925],[131.8,h]]
+ // Original Blending Curves Fin 37, extracted from the supplied 4.5-inch PDF vector path.
+ // Stations are in mm, measured from the leading root; source height = 114.3 mm.
+ if(state.template==="fin37")return {
+  lead:[[0,0],[6.20,h*.1],[12.86,h*.2],[20.07,h*.3],[27.94,h*.4],[36.61,h*.5],[46.33,h*.6],[57.48,h*.7],[70.77,h*.8],[87.99,h*.9],[125.70,h]],
+  trail:[[110.83,0],[107.42,h*.1],[105.33,h*.2],[104.51,h*.3],[105.46,h*.4],[108.82,h*.5],[114.87,h*.6],[124.00,h*.7],[136.74,h*.8],[147.61,h*.9],[125.70,h]]
  };
 }
 function pointSlope(points,k){const n=points.length,p=points[k];if(Number.isFinite(p.m))return p.m;if(k===0)return (points[1][0]-points[0][0])/(points[1][1]-points[0][1]);if(k===n-1)return (points[n-1][0]-points[n-2][0])/(points[n-1][1]-points[n-2][1]);return (points[k+1][0]-points[k-1][0])/(points[k+1][1]-points[k-1][1]);}
@@ -77,7 +76,7 @@ function edgeX(points,y){
  return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
-function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead),targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
+function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead);if(state.template==="fin37"){const scale=state.base/110.83,chord=rawChord*scale+state.tip*t,leading=rawLead*scale+state.sweep*t;return [leading,leading+chord];}const targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
 function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
