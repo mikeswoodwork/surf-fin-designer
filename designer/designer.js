@@ -5,7 +5,7 @@ const presets={center:{height:120,base:110,tip:42,sweep:30,thickness:8,foilPos:3
 let importedOutline=null,importedAspect=1,outlinePoints=null,selectedPoint=null,dragPoint=null;
 const params=new URLSearchParams(location.search);const initialFin=params.get("fin")==="center"?"center":"side";const initialSetup=params.get("setup")||"thruster";const initialBox=params.get("system")==="us-box"?"usbox":"futures";
 let state={finType:initialFin,template:params.get("template")|| (initialSetup==="single"?"fin7":initialSetup==="twin"?"fin25":"fin37"),foilType:initialFin==="center"?"symmetric":"flat",setup:initialSetup,box:initialBox,...presets[initialFin]};
-const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],["tip","Tip chord",0,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
+const definitions=[["height","Height",60,300,1],["base","Root chord",55,240,1],["tip","Tip chord",0,110,1],["sweep","Sweep / Rake",0,100,1],["thickness","Max. thickness",3,18,.5],["foilPos","Max. thickness position",20,80,1],["cant","Cant angle",-5,15,.5]];
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
