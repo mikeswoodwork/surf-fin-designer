@@ -88,12 +88,14 @@ function splineIntersections(y){
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
 function outlineAt(v){
  const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,hits=splineIntersections(y);
- if(hits.length<2)return [0,0];
+ if(hits.length===0)return [0,0];
  const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/s.base;
+ if(hits.length===1){const x=hits[0]*scale+sweepOffset(y,s);return [x,x];}
  const left=hits[0]*scale,right=hits[hits.length-1]*scale;
  const sourceH=s.height,scaledY=y/sourceH;
  return [left+state.sweep*scaledY,right+state.sweep*scaledY];
 }
+function sweepOffset(y,s){return state.sweep*(y/s.height);}
 function pointSlope(points,k){return 0;}
 function edgeX(points,y){return 0;}
 function outline(){const p=[],n=2500;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
