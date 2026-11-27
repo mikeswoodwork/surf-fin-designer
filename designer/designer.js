@@ -124,10 +124,10 @@ function updateFinBase(){
  // transform instead of reconstructing a parallel transform independently.
  finBaseGroup=new THREE.Group();
  const position=Math.max(0,Math.min(100,state.basePosition??50))/100;
- const root=outlineAt(0),rootMin=Math.min(...root),rootMax=Math.max(...root);
- finMesh.geometry.computeBoundingBox();
- const bb=finMesh.geometry.boundingBox,meshCenterX=(bb.min.x+bb.max.x)/2;
- const rootStart=rootMin-meshCenterX,rootEnd=rootMax-meshCenterX,rootLength=rootEnd-rootStart;
+ const root=outlineAt(0),rootStart=Math.min(...root),rootEnd=Math.max(...root);
+ // finBaseGroup is a child of finMesh: coordinates are already in the
+ // fin mesh local frame. Do not subtract the swept mesh bounding-box centre.
+ const rootLength=rootEnd-rootStart;
  const rp=profile(.5,frontThicknessAt(0));
  finBaseGroup.position.set(0,-(rp.top+rp.bottom)/2+Number(state.baseLateral||0),0);
  if(state.box==="futures"){
