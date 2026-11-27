@@ -67,7 +67,7 @@ function edgeX(points,y){
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
 function outlineAt(v){const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height,rawLead=edgeX(p.lead,y),rawTrail=edgeX(p.trail,y),rootChord=Math.max(1,edgeX(p.trail,0)-edgeX(p.lead,0)),rawChord=Math.max(0,rawTrail-rawLead),targetChord=state.base*(1-t)+state.tip*t,chord=rawChord/rootChord*targetChord,leading=rawLead-edgeX(p.lead,0)+state.sweep*t;return [leading,leading+chord];}
-function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const y=state.height*i/n;p.push([edgeX(getOutlinePoints().lead,y),y]);}for(let i=n;i>=0;i--){const y=state.height*i/n;p.push([edgeX(getOutlinePoints().trail,y),y]);}return p;}
+function outline(){const p=[],n=100;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
 function outlineViewMap(){
  const pts=outline(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=0,maxY=state.height;
  const scale=Math.min(290/Math.max(1,maxX-minX),330/Math.max(1,maxY-minY));
@@ -76,7 +76,8 @@ function outlineViewMap(){
 }
 function drawOutlineHandles(){
  const group=$("outline-handles");if(!group)return;const p=getOutlinePoints(),map=outlineViewMap();
- const items=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))];
+ const displayPoint=(edge,q)=>{const v=q[1]/state.height,edges=outlineAt(v);return [edge==="lead"?edges[0]:edges[1],q[1]];};
+ const items=[...p.lead.map((q,i)=>({edge:"lead",i,q:displayPoint("lead",q)})),...p.trail.map((q,i)=>({edge:"trail",i,q:displayPoint("trail",q)}))];
  group.innerHTML=items.map(({edge,i,q})=>{const [x,y]=map.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?8:7)+'"/>';}).join("");
  const tg=$("tangent-handles");if(tg){const chosen=selectedPoint?items.filter(q=>q.edge===selectedPoint.edge&&q.i===selectedPoint.i):[];tg.innerHTML=chosen.map(({edge,i,q})=>{const m=pointSlope(p[edge],i),a=map.toSvg(q),b=map.toSvg([q[0]+m*12,q[1]+12]);return '<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"/><circle class="tangent-handle" data-edge="'+edge+'" data-index="'+i+'" cx="'+b[0]+'" cy="'+b[1]+'" r="5"/>';}).join("");}
 }
@@ -88,8 +89,8 @@ function bindOutlineEditor(){
   const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
   const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=outlineViewMap(),p=map.toModel([local.x,local.y]);
   const arr=getOutlinePoints()[dragPoint.edge],i=dragPoint.i;
-  if(dragPoint.mode==="tangent"){arr[i].m=Math.max(-8,Math.min(8,(p[0]-arr[i][0])/12));}
-  else{const low=i===0?0:arr[i-1][1]+1,high=i===arr.length-1?state.height:arr[i+1][1]-1;p[1]=Math.max(low,Math.min(high,p[1]));p[0]=Math.max(-15,Math.min(210,p[0]));arr[i]=p;}
+  if(dragPoint.mode==="tangent"){const base=arr[i],v=base[1]/state.height,root=edgeX(getOutlinePoints().lead,0),rootChord=Math.max(1,edgeX(getOutlinePoints().trail,0)-root),factor=(state.base*(1-v)+state.tip*v)/rootChord;arr[i].m=Math.max(-8,Math.min(8,((p[0]-outlineAt(v)[dragPoint.edge==="lead"?0:1])/12)/(Math.max(.05,factor))));}
+  else{const low=i===0?0:arr[i-1][1]+1,high=i===arr.length-1?state.height:arr[i+1][1]-1;p[1]=Math.max(low,Math.min(high,p[1]));const v=p[1]/state.height,edges=outlineAt(v),root=edgeX(getOutlinePoints().lead,0),rootChord=Math.max(1,edgeX(getOutlinePoints().trail,0)-root),factor=(state.base*(1-v)+state.tip*v)/rootChord,displayX=p[0],displayLead=edges[0];p[0]=dragPoint.edge==="lead"?displayX+root-state.sweep*v:root+(displayX-displayLead)/Math.max(.05,factor)+edgeX(getOutlinePoints().lead,p[1]);p[0]=Math.max(-15,Math.min(210,p[0]));arr[i]=p;}
   update();
  });
  const finish=e=>{if(dragPoint&&dragPoint.pointerId===e.pointerId)dragPoint=null;};
