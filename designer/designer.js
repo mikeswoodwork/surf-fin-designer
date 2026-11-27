@@ -9,7 +9,7 @@ const definitions=[["height","Height",60,220,1],["base","Root chord",55,180,1],[
 const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
-function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{state[id]=Number(e.value);update();});});}
+function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
 function templateValues(){if(state.template==="upright"){state.sweep=22;state.tip=42;}if(state.template==="hpsb"){state.height=120;state.base=118;state.tip=16;state.sweep=42;}if(state.template==="pivot"){state.sweep=18;state.tip=42;}if(state.template==="raked"){state.sweep=43;state.tip=36;}if(state.template==="keel"){state.height=90;state.base=155;state.tip=70;state.sweep=62;}syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
@@ -57,12 +57,12 @@ function defaultOutline(){
   trail:[[118,0],[114.1,12.5],[111.5,25.6],[110.8,38.7],[112.8,51.8],[118,65],[126.6,78],[139.7,91],[155.4,104],[154.8,111],[147.5,117.4],[131.8,120]]
  };
 }
+function pointSlope(points,k){const n=points.length,p=points[k];if(Number.isFinite(p.m))return p.m;if(k===0)return (points[1][0]-points[0][0])/(points[1][1]-points[0][1]);if(k===n-1)return (points[n-1][0]-points[n-2][0])/(points[n-1][1]-points[n-2][1]);return (points[k+1][0]-points[k-1][0])/(points[k+1][1]-points[k-1][1]);}
 function edgeX(points,y){
  const n=points.length;if(y<=points[0][1])return points[0][0];if(y>=points[n-1][1])return points[n-1][0];
  let i=0;while(i<n-2&&points[i+1][1]<y)i++;
  const p0=points[i],p1=points[i+1],dy=p1[1]-p0[1],t=(y-p0[1])/dy;
- const slope=(k)=>{if(k===0)return (points[1][0]-points[0][0])/(points[1][1]-points[0][1]);if(k===n-1)return (points[n-1][0]-points[n-2][0])/(points[n-1][1]-points[n-2][1]);return (points[k+1][0]-points[k-1][0])/(points[k+1][1]-points[k-1][1]);};
- const m0=slope(i)*dy,m1=slope(i+1)*dy,t2=t*t,t3=t2*t;
+ const m0=pointSlope(points,i)*dy,m1=pointSlope(points,i+1)*dy,t2=t*t,t3=t2*t;
  return (2*t3-3*t2+1)*p0[0]+(t3-2*t2+t)*m0+(-2*t3+3*t2)*p1[0]+(t3-t2)*m1;
 }
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
@@ -76,10 +76,9 @@ function outlineViewMap(){
 }
 function drawOutlineHandles(){
  const group=$("outline-handles");if(!group)return;const p=getOutlinePoints(),map=outlineViewMap();
- group.innerHTML=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))].map(({edge,i,q})=>{
-  const [x,y]=map.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;
-  return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?8:7)+'"/>';
- }).join("");
+ const items=[...p.lead.map((q,i)=>({edge:"lead",i,q})),...p.trail.map((q,i)=>({edge:"trail",i,q}))];
+ group.innerHTML=items.map(({edge,i,q})=>{const [x,y]=map.toSvg(q),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<circle class="outline-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(active?8:7)+'"/>';}).join("");
+ const tg=$("tangent-handles");if(tg)tg.innerHTML=items.map(({edge,i,q})=>{const m=pointSlope(p[edge],i),a=map.toSvg(q),b=map.toSvg([q[0]+m*12,q[1]+12]),active=selectedPoint?.edge===edge&&selectedPoint.i===i;return '<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"/><circle class="tangent-handle'+(active?' selected':'')+'" data-edge="'+edge+'" data-index="'+i+'" cx="'+b[0]+'" cy="'+b[1]+'" r="5"/>';}).join("");
 }
 function bindOutlineEditor(){
  const svg=$("side-view");
@@ -89,9 +88,9 @@ function bindOutlineEditor(){
   const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
   const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=outlineViewMap(),p=map.toModel([local.x,local.y]);
   const arr=getOutlinePoints()[dragPoint.edge],i=dragPoint.i;
-  const low=i===0?0:arr[i-1][1]+1,high=i===arr.length-1?state.height:arr[i+1][1]-1;
-  p[1]=Math.max(low,Math.min(high,p[1]));p[0]=Math.max(-15,Math.min(210,p[0]));
-  arr[i]=p;update();
+  if(dragPoint.mode==="tangent"){arr[i].m=Math.max(-8,Math.min(8,(p[0]-arr[i][0])/12));}
+  else{const low=i===0?0:arr[i-1][1]+1,high=i===arr.length-1?state.height:arr[i+1][1]-1;p[1]=Math.max(low,Math.min(high,p[1]));p[0]=Math.max(-15,Math.min(210,p[0]));arr[i]=p;}
+  update();
  });
  const finish=e=>{if(dragPoint&&dragPoint.pointerId===e.pointerId)dragPoint=null;};
  svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);svg.addEventListener("lostpointercapture",()=>{dragPoint=null;});
