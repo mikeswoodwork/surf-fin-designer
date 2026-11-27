@@ -19,3 +19,6 @@
 .tangent-fields label{display:block;font-size:10px;color:#dce3e1}
 .tangent-fields input{display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:8px 9px;background:#101b24;border:1px solid var(--line);border-radius:5px;color:#f0d4b1;font:inherit;font-size:12px}
 #tangent-controls>small{display:block;margin-top:10px}
+
+/* Editable front thickness and foil spline controls */
+#front-view,#foil-svg{touch-action:none}.foil-preview svg{overflow:visible}.foil-preview .tangent-line{stroke:#e8a45e;stroke-dasharray:3 2}.foil-preview .outline-handle,.view-card .outline-handle{fill:#f0d4b1;stroke:#14232c;stroke-width:1.5;cursor:grab;touch-action:none}.foil-preview .tangent-handle,.view-card .tangent-handle{fill:#e8a45e;stroke:#fff;stroke-width:1;cursor:crosshair;touch-action:none}.foil-preview .selected,.view-card .selected{stroke:#fff;stroke-width:2.5}
