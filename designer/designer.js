@@ -344,10 +344,10 @@ function bindPointKeyboard(){
   if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;
   const tag=e.target?.tagName?.toLowerCase();if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
   const focused=e.target?.matches?.("[data-kind][data-seg][data-cp]")?e.target:null;
-  const step=e.altKey?.01:e.shiftKey?1:.1,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
+  const step=e.altKey?.05:e.shiftKey?1:.25,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
   if(focused?.dataset.kind==="front"||focused?.dataset.kind==="foil"){
    const kind=focused.dataset.kind,si=Number(focused.dataset.seg),cp=Number(focused.dataset.cp),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si];if(!seg)return;
-   const scale=kind==="foil"?.005:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
+   const scale=kind==="foil"?.1:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
    if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.2,p[0]));p[1]=Math.max(0,Math.min(state.height,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}
    const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
    if(cp===0){seg[1]=[seg[1][0]+ox,seg[1][1]+oy];if(si>0){segs[si-1][3]=p;segs[si-1][2]=[segs[si-1][2][0]+ox,segs[si-1][2][1]+oy];}}
