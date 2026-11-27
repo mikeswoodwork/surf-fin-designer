@@ -10,7 +10,7 @@ const foilDefs=[["concavity","Innenkonkavität",0,3,.1]];
 function buildControls(){ $("shape-controls").innerHTML=definitions.slice(0,4).map(field).join("");$("foil-controls").innerHTML=definitions.slice(4).map(field).join("")+foilDefs.map(field).join("");bindRanges(); }
 function field([id,label,min,max,step]){return `<div class="range-field"><div><label for="${id}">${label}</label><output id="${id}-out"></output></div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[id]??0}"></div>`;}
 function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const e=$(id);if(!e)return;e.addEventListener("input",()=>{const next=Number(e.value);if(id==="height"&&outlinePoints){const old=state.height,scale=next/old;for(const edge of ["lead","trail"])outlinePoints[edge].forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});}state[id]=next;update();});});}
-function templateValues(){if(state.template==="upright"){state.sweep=22;state.tip=42;}if(state.template==="hpsb"){state.height=120;state.base=118;state.tip=16;state.sweep=42;}if(state.template==="pivot"){state.sweep=18;state.tip=42;}if(state.template==="raked"){state.sweep=43;state.tip=36;}if(state.template==="keel"){state.height=90;state.base=155;state.tip=70;state.sweep=62;}syncInputs();}
+function templateValues(){const values={upright:{height:120,base:110,tip:42,sweep:22},hpsb:{height:120,base:118,tip:16,sweep:42},raked:{height:115,base:112,tip:36,sweep:43},pivot:{height:150,base:135,tip:40,sweep:24},single:{height:165,base:135,tip:28,sweep:20},quad:{height:95,base:100,tip:24,sweep:48},keel:{height:85,base:160,tip:70,sweep:58}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{state.finType=e.target.value;Object.assign(state,presets[state.finType]);$("foilType").value=state.finType==="center"?"symmetric":"flat";state.foilType=$("foilType").value;state.template=state.finType==="side"?"hpsb":"upright";outlinePoints=null;selectedPoint=null;$("template").value=state.template;syncInputs();update();});
 $("template").addEventListener("change",e=>{state.template=e.target.value;if(state.template!=="custom"){importedOutline=null;importedAspect=1;outlinePoints=null;$("outline-status").textContent="Blending-Curves-inspirierte Startkontur";}templateValues();update();});
@@ -38,9 +38,19 @@ function defaultOutline(){
  // Control stations are in millimetres from the root. Shapes are editable archetypes,
  // with the characteristic planforms of the selected fin family.
  if(state.template==="keel")return {
-  // Both edges converge at one tip point: no flat closing edge.
-  lead:[[0,0],[3,h*.16],[12,h*.38],[27,h*.64],[48,h*.84],[67,h]],
-  trail:[[158,0],[157,h*.12],[150,h*.28],[132,h*.48],[103,h*.70],[76,h*.88],[67,h]]
+  // Broad fish keel: long base, fuller trailing edge and rounded swept tip.
+  lead:[[0,0],[8,h*.24],[23,h*.52],[45,h*.82],[67,h]],
+  trail:[[160,0],[157,h*.24],[145,h*.52],[111,h*.82],[67,h]]
+ };
+ if(state.template==="quad")return {
+  // Compact rear quad fin: short span, narrow base and strongly swept tip.
+  lead:[[0,0],[8,h*.25],[22,h*.52],[43,h*.82],[61,h]],
+  trail:[[100,0],[94,h*.25],[80,h*.52],[65,h*.82],[61,h]]
+ };
+ if(state.template==="single")return {
+  // Upright singlefin: deep base, moderate rake and a narrow rounded tip.
+  lead:[[0,0],[5,h*.25],[13,h*.52],[27,h*.82],[39,h]],
+  trail:[[135,0],[130,h*.25],[113,h*.52],[76,h*.82],[39,h]]
  };
  if(state.template==="raked")return {
   lead:[[0,0],[3,h*.18],[10,h*.40],[21,h*.66],[35,h*.86],[44,h]],
@@ -137,7 +147,7 @@ async function importOutline(file){
 }
 function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}area=Math.abs(area/2);$("read-area").textContent=Math.round(area)+" mm²";$("read-volume").textContent=Math.round(area*state.thickness*.52)+" mm³";}
 function pathFor(points,width,height,pad=12){const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),sx=(width-2*pad)/Math.max(1,maxX-minX),sy=(height-2*pad)/Math.max(1,maxY-minY),scale=Math.min(sx,sy),ox=(width-(maxX-minX)*scale)/2,oy=(height-(maxY-minY)*scale)/2;return points.map((p,i)=>(i?"L":"M")+(ox+(p[0]-minX)*scale).toFixed(2)+","+(height-oy-(p[1]-minY)*scale).toFixed(2)).join(" ")+" Z";}
-function updateTechnicalViews(){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));drawOutlineHandles();const top=[];for(let i=0;i<=60;i++){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.top]);}for(let i=60;i>=0;i--){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.bottom]);}$("top-view-path").setAttribute("d",pathFor(top,320,170,14));const front=[];for(let i=0;i<=48;i++){const v=i/48,z=state.height*v,t=state.thickness*Math.pow(Math.max(0,1-v),.85),f=profile(.38,t);front.push([z,f.top]);}for(let i=48;i>=0;i--){const v=i/48,z=state.height*v,t=state.thickness*Math.max(.08,1-.78*Math.pow(v,.9)),f=profile(.38,t);front.push([z,f.bottom]);}$("front-view-path").setAttribute("d",pathFor(front,320,170,14));}
+function updateTechnicalViews(){const p=outline();$("side-view-path").setAttribute("d",pathFor(p,320,360,15));drawOutlineHandles();const top=[];for(let i=0;i<=60;i++){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.top]);}for(let i=60;i>=0;i--){const u=i/60,f=profile(u,state.thickness);top.push([u*100,f.bottom]);}$("top-view-path").setAttribute("d",pathFor(top,320,170,14));const front=[];for(let i=0;i<=48;i++){const v=i/48,z=state.height*v,t=state.thickness*Math.pow(Math.max(0,1-v),.85),f=profile(.38,t);front.push([z,f.top]);}for(let i=48;i>=0;i--){const v=i/48,z=state.height*v,t=state.thickness*Math.pow(Math.max(0,1-v),.85),f=profile(.38,t);front.push([z,f.bottom]);}$("front-view-path").setAttribute("d",pathFor(front,320,170,14));}
 function updateFoil(){const pts=[];for(let i=0;i<=80;i++){let x=i/80,p=profile(x,state.thickness);pts.push([15+x*290,55-p.top*5]);}for(let i=80;i>=0;i--){let x=i/80,p=profile(x,state.thickness);pts.push([15+x*290,55-p.bottom*5]);} $("foil-path").setAttribute("d",pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ")+"Z");}
 function update(){[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="foilPos"?" %":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin();metrics();updateFoil();updateTechnicalViews();}
 function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===mode));if(mode==="3d"){camera.position.set(220,170,260);controls.enableRotate=true;}else if(mode==="side"){camera.position.set(0,0,420);controls.enableRotate=false;}else{camera.position.set(420,0,0);controls.enableRotate=false;}controls.target.set(0,0,0);controls.update();}
