@@ -41,7 +41,8 @@ function splineValue(segs,t,axis=0,extent=1){const target=Math.max(0,Math.min(ex
 function profile(x,totalThickness){const u=Math.max(0,Math.min(1,x)),q=splineValue(foilSpline,u,0,1),half=totalThickness*.5*q[1];if(state.foilType==="symmetric")return {top:half,bottom:-half};if(state.foilType==="flat")return {top:totalThickness*q[1],bottom:0};return {top:totalThickness*.9*q[1],bottom:-(state.concavity||0)*Math.sin(Math.PI*u)};}
 function frontThicknessAt(v){const p=splineValue(getFrontSpline(),v,1,state.height);return Math.max(0,p[0]);}
 
-function makeFin(){if(finMesh){scene.remove(finMesh);finMesh.geometry.dispose();finMesh.material.dispose();}
+function disposeMeshTree(root){root.traverse(obj=>{if(obj.geometry)obj.geometry.dispose();if(obj.material){if(Array.isArray(obj.material))obj.material.forEach(m=>m.dispose());else obj.material.dispose();}});}
+function makeFin(){if(finMesh){scene.remove(finMesh);disposeMeshTree(finMesh);}
  const H=state.height,B=state.base,T=state.tip,S=state.sweep,th=state.thickness,segments=1000,chordSteps=36,verts=[],indices=[];
  // Two foil surfaces; z is span, x is chord, y is thickness.
  for(let side=0;side<2;side++){for(let i=0;i<=segments;i++){const v=i/segments,z=H*v,edges=outlineAt(v),leading=edges[0],chord=edges[1]-edges[0];for(let j=0;j<=chordSteps;j++){const u=j/chordSteps,x=leading+u*chord;const taper=Math.pow(Math.max(0,1-v),.85);const maxT=frontThicknessAt(v);const f=profile(u,maxT);const foilY=(side===0?f.top:f.bottom);const cantShift=state.finType==="side"?z*Math.tan((state.cant||0)*Math.PI/180):0;const y=foilY+cantShift;verts.push(x,y,z);}}}
