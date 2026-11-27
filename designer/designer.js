@@ -210,7 +210,7 @@ function outlineAt(v){
  const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height;
  if(p.lead?.length&&p.trail?.length){
   const sample=edge=>{const target=y;let i=edge.findIndex(q=>q[1]>=target);if(i===0)return edge[0][0];if(i<0)return edge[edge.length-1][0];const a=edge[i-1],b=edge[i],d=b[1]-a[1];return d?a[0]+(b[0]-a[0])*(target-a[1])/d:a[0];};
-  const offset=state.sweep*t;return [sample(p.lead)+offset,sample(p.trail)+offset];
+  const rootWidth=Math.max(1e-6,p.base||(p.trail[0][0]-p.lead[0][0])),scale=state.base/rootWidth,offset=state.sweep*t,rootX=p.lead[0][0];return [(sample(p.lead)-rootX)*scale+rootX+offset,(sample(p.trail)-rootX)*scale+rootX+offset];
  }
  const hits=splineIntersections(y);if(hits.length===0)return [0,0];
  const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/s.base;
@@ -333,7 +333,7 @@ async function importOutline(file){
  const normalizedOutline=normalized;const aspect=(maxX-minX)/(maxY-minY);const lead=[],trail=[];
  for(let k=0;k<=6;k++){const v=k/6,y=k===0?1e-7:k===6?1-1e-7:v;const hits=[];for(let i=0;i<normalizedOutline.length;i++){const a=normalizedOutline[i],b=normalizedOutline[(i+1)%normalizedOutline.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){const t=(y-a[1])/(b[1]-a[1]);hits.push(a[0]+t*(b[0]-a[0]));}}hits.sort((a,b)=>a-b);if(hits.length>=2){lead.push([hits[0]*state.height*aspect,v*state.height]);trail.push([hits[hits.length-1]*state.height*aspect,v*state.height]);}}
  if(lead.length<3)throw new Error("Die SVG-Kontur muss eine geschlossene Finnen-Seitenkontur sein.");
- outlinePoints={lead,trail};importedOutline=null;importedAspect=1;state.template="custom";$("template").value="custom";update();
+ outlinePoints={lead,trail,base:Math.max(1,trail[0][0]-lead[0][0]),height:state.height};state.base=outlinePoints.base;importedOutline=null;importedAspect=1;state.template="custom";$("template").value="custom";syncInputs();update();
  $("outline-status").textContent=file.name+" · "+pts.length+" Stützpunkte · importiert";
 }
 function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}area=Math.abs(area/2);$("read-area").textContent=Math.round(area)+" mm²";$("read-volume").textContent=Math.round(area*state.thickness*.52)+" mm³";}
