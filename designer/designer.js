@@ -269,7 +269,7 @@ function outlineAt(v){
   const sample=edge=>{const target=y;let i=edge.findIndex(q=>q[1]>=target);if(i===0)return edge[0][0];if(i<0)return edge[edge.length-1][0];const a=edge[i-1],b=edge[i],d=b[1]-a[1];return d?a[0]+(b[0]-a[0])*(target-a[1])/d:a[0];};
   const rootWidth=Math.max(1e-6,p.base||(p.trail[0][0]-p.lead[0][0])),scale=state.base/rootWidth,offset=state.sweep*t,rootX=p.lead[0][0];return [(sample(p.lead)-rootX)*scale+rootX+offset,(sample(p.trail)-rootX)*scale+rootX+offset];
  }
- const hits=splineIntersections(y);if(hits.length===0)return [0,0];
+ const sampleY=Math.min(y,state.height-1e-4),hits=splineIntersections(sampleY);if(hits.length===0)return [0,0];
  const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/(p.base||s.base);
  if(hits.length===1){const x=hits[0]*scale,tipCorrection=(state.tip-sourceTipWidth)*t*.5,shift=(state.sweep-(p.sweep||0)*scale)*t;return [x+shift-tipCorrection,x+shift+tipCorrection];}
  const left=hits[0]*scale,right=hits[hits.length-1]*scale;
