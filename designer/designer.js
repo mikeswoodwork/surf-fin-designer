@@ -348,6 +348,9 @@ function nudgeOutlinePoint(segIndex,cp,dx,dy){
  selectedPoint={seg:segIndex,cp};update({interactive:true});saveDesign();requestAnimationFrame(()=>{const h=document.querySelector("#outline-handles .handle-hit[data-seg=\""+segIndex+"\" ][data-cp=\""+cp+"\"]");h?.focus({preventScroll:true});});
 }
 function bindPointKeyboard(){
+ const focusRange=e=>{const range=e.target?.closest?.('input[type="range"]');if(range)requestAnimationFrame(()=>range.focus({preventScroll:true}));};
+ document.addEventListener("pointerup",focusRange,true);
+ document.addEventListener("touchend",focusRange,{capture:true,passive:true});
  document.addEventListener("focusin",e=>{const h=e.target?.closest?.(".handle-hit[data-seg][data-cp]:not([data-kind])");if(h){selectedPoint={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};updateTangentFields();}});
  document.addEventListener("keydown",e=>{
   if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;
@@ -360,7 +363,7 @@ function bindPointKeyboard(){
   }
   if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
   const focused=e.target?.matches?.(".handle-hit[data-kind][data-seg][data-cp]")?e.target:null;
-  const step=e.altKey?.5:e.shiftKey?10:2.5,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
+  const isTangent=focused?(Number(focused.dataset.cp)===1||Number(focused.dataset.cp)===2):false,baseStep=isTangent?25:2.5,step=e.altKey?baseStep*.2:e.shiftKey?baseStep*4:baseStep,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
   if(focused?.dataset.kind==="front"||focused?.dataset.kind==="foil"){
    const kind=focused.dataset.kind,si=Number(focused.dataset.seg),cp=Number(focused.dataset.cp),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si];if(!seg)return;
    const scale=kind==="foil"?.1:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
@@ -371,7 +374,7 @@ function bindPointKeyboard(){
    if(kind==="front")frontSelection={seg:si,cp};else foilSelection={seg:si,cp};const svgId=focused.closest("svg")?.id;update({interactive:true});saveDesign();focusProfileHandle(kind,si,cp,svgId);e.preventDefault();return;
   }
   if(selectedPoint){nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);e.preventDefault();}
- });
+ },true);
 }
 let outlineFrame=0,outlinePending=null;
 function bindOutlineEditor(){
