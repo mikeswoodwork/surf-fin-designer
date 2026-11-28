@@ -123,8 +123,9 @@ function makeFin(interactive=false){if(finMesh){scene.remove(finMesh);disposeMes
  const row=chordSteps+1,layer=(segments+1)*row;
  for(let side=0;side<2;side++){const offset=side*layer;for(let i=0;i<segments;i++)for(let j=0;j<chordSteps;j++){const a=offset+i*row+j,b=a+row,c=b+1,d=a+1;if(side===0)indices.push(a,b,d,b,c,d);else indices.push(a,d,b,b,d,c);}}
  // close leading/trailing edges and root/tip perimeter
- for(let i=0;i<segments;i++)for(const j of [0,chordSteps]){const a=i*row+j,b=a+row,c=layer+a,d=layer+b;indices.push(a,c,b,b,c,d);}
- for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;indices.push(a,b,c,b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;indices.push(e,g,f,f,g,h);}
+ // Leading and trailing edges have zero foil thickness: the upper and lower surfaces meet there.
+ // Do not create zero-area side-wall triangles; Safari/WebKit can rasterize these as stray spikes.
+ for(let j=0;j<chordSteps;j++){const a=j,b=j+1,c=layer+a,d=layer+b;if(j>0)indices.push(a,b,c);if(j<chordSteps-1)indices.push(b,d,c);const e=segments*row+j,f=e+1,g=layer+e,h=layer+f;if(j>0)indices.push(e,g,f);if(j<chordSteps-1)indices.push(f,g,h);}
  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0xc58d5b,roughness:.38,metalness:.08,side:THREE.DoubleSide});finMesh=new THREE.Mesh(geo,mat);finMesh.rotation.x=-Math.PI/2;geo.computeBoundingBox();const bounds=geo.boundingBox;// Local z is the fin span; after rotation it becomes world y.
  finMesh.position.set(-(bounds.min.x+bounds.max.x)/2,-(bounds.min.z+bounds.max.z)/2,0);scene.add(finMesh);updateFinBase();controls.target.set(0,0,0); }
 
