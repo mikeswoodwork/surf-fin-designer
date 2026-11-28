@@ -46,7 +46,7 @@ function applyControlValue(id,value){
  if($(id+"-out"))$(id+"-out").textContent=next+(id==="cant"?"°":" mm");
  if(!controlFrame)controlFrame=requestAnimationFrame(()=>{controlFrame=0;update({interactive:true});});
 }
-function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const range=$(id),number=$(id+"-value");if(!range)return;range.addEventListener("input",()=>applyControlValue(id,range.value));range.addEventListener("change",()=>update());range.addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;e.preventDefault();const step=Number(range.step)||1,mult=e.shiftKey?10:e.altKey?.1:1,dir=(e.key==="ArrowRight"||e.key==="ArrowUp")?1:-1;applyControlValue(id,Number(range.value)+dir*step*mult);});if(number){number.addEventListener("input",()=>{if(number.value!=="")applyControlValue(id,number.value);});number.addEventListener("change",()=>{const v=Number(number.value);if(Number.isFinite(v))applyControlValue(id,v);number.value=String(state[id]);update();});}});}
+function bindRanges(){[...definitions,...foilDefs].forEach(([id])=>{const range=$(id),number=$(id+"-value");if(!range)return;range.addEventListener("input",()=>applyControlValue(id,range.value));range.addEventListener("change",()=>update());if(number){number.addEventListener("input",()=>{if(number.value!=="")applyControlValue(id,number.value);});number.addEventListener("change",()=>{const v=Number(number.value);if(Number.isFinite(v))applyControlValue(id,v);number.value=String(state[id]);update();});}});}
 function templateValues(){frontSpline=null;const values={fin37:{height:114.3,base:110.8251,tip:0,sweep:0},fin25:{height:126.9996,base:191.9363,tip:0,sweep:0},fin7:{height:254,base:183.8071,tip:0,sweep:0},fin15:{height:254,base:180.8438,tip:0,sweep:0}};const v=values[state.template];if(v)Object.assign(state,v);syncInputs();}
 function syncInputs(){[...definitions,...foilDefs].forEach(([id])=>{if($(id))$(id).value=state[id]??0;if($(id+"-value"))$(id+"-value").value=state[id]??0;});}
 $("finType").addEventListener("change",e=>{
@@ -351,9 +351,16 @@ function bindPointKeyboard(){
  document.addEventListener("focusin",e=>{const h=e.target?.closest?.(".handle-hit[data-seg][data-cp]:not([data-kind])");if(h){selectedPoint={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};updateTangentFields();}});
  document.addEventListener("keydown",e=>{
   if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;
-  const tag=e.target?.tagName?.toLowerCase();if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
+  const tag=e.target?.tagName?.toLowerCase();
+  if(tag==="input"&&e.target.type==="range"){
+   const range=e.target,id=range.id,step=Number(range.step)||1,mult=e.shiftKey?10:e.altKey?.1:1,dir=(e.key==="ArrowRight"||e.key==="ArrowUp")?1:-1;
+   if(["height","base","tip","sweep","thickness","cant","concavity"].includes(id)){e.preventDefault();applyControlValue(id,Number(range.value)+dir*step*mult);return;}
+   if(id==="base-position"){e.preventDefault();applyBasePosition(Number(range.value)+dir*step*mult);update();return;}
+   if(id==="base-lateral"){e.preventDefault();applyBaseLateral(Number(range.value)+dir*step*mult);update();return;}
+  }
+  if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
   const focused=e.target?.matches?.(".handle-hit[data-kind][data-seg][data-cp]")?e.target:null;
-  const step=e.altKey?.05:e.shiftKey?1:.25,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
+  const step=e.altKey?.5:e.shiftKey?10:2.5,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
   if(focused?.dataset.kind==="front"||focused?.dataset.kind==="foil"){
    const kind=focused.dataset.kind,si=Number(focused.dataset.seg),cp=Number(focused.dataset.cp),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si];if(!seg)return;
    const scale=kind==="foil"?.1:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
