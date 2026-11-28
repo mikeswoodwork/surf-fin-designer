@@ -411,7 +411,7 @@ function bindPointKeyboard(){
   if(active&&["front","foil"].includes(active.kind)){
    const isTangent=active.cp===1||active.cp===2,svgId=active.svgId||focused?.closest("svg")?.id,topView=svgId==="top-view",frontView=active.kind==="front",baseStep=topView?(isTangent?5/3:0.25):frontView&&isTangent?5/3:(isTangent?5:0.5),step=e.altKey?baseStep*.2:e.shiftKey?baseStep*4:baseStep,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
    e.preventDefault();e.stopPropagation();
-   const kind=active.kind,si=active.seg,cp=active.cp,segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si],svgId=active.svgId||focused?.closest("svg")?.id;if(!seg)return;
+   const kind=active.kind,si=active.seg,cp=active.cp,segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si];if(!seg)return;
    const scale=kind==="foil"?.1:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
    if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.2,p[0]));p[1]=Math.max(0,Math.min(state.height,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}
    const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
