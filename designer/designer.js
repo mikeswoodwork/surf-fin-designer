@@ -88,6 +88,15 @@ function splineExtent(segs,axis){
  for(const seg of segs)for(let i=0;i<=80;i++){const v=bezierValue(seg,i/80)[axis];min=Math.min(min,v);max=Math.max(max,v);}
  return {min,max,span:max-min};
 }
+function enforceFoilMonotonicity(){
+ for(let i=0;i<foilSpline.length;i++){
+  const seg=foilSpline[i],start=i===0?0:foilSpline[i-1][3][0],end=i===foilSpline.length-1?1:Math.max(start+.01,seg[3][0]);
+  seg[0][0]=start;seg[3][0]=end;
+  seg[1][0]=Math.max(start,Math.min(end,seg[1][0]));
+  seg[2][0]=Math.max(seg[1][0],Math.min(end,seg[2][0]));
+  if(i<foilSpline.length-1)foilSpline[i+1][0][0]=end;
+ }
+}
 function syncProfileParameters(kind){
  const foilMax=Math.max(.001,splineExtent(foilSpline,1).max);
  if(kind==="front"){
@@ -378,7 +387,7 @@ function focusProfileHandle(kind,seg,cp,svgId){requestAnimationFrame(()=>{const 
 function bindProfileEditors(){
  document.querySelectorAll("#front-view,#foil-svg,#top-view").forEach(svg=>{
   svg.addEventListener("pointerdown",e=>{const h=e.target.closest(".handle-hit[data-kind]");if(!h)return;e.preventDefault();const kind=h.dataset.kind,selection={seg:Number(h.dataset.seg),cp:Number(h.dataset.cp)};selectEditorPoint(kind,selection.seg,selection.cp,svg.id);const drag={...selection,pointerId:e.pointerId,moved:false};if(kind==="front"){frontDrag=drag;}else{foilDrag=drag;}svg.setPointerCapture(e.pointerId);focusProfileHandle(kind,selection.seg,selection.cp,svg.id);});
-  svg.addEventListener("pointermove",e=>{const kind=svg.id==="front-view"?"front":"foil",drag=kind==="front"?frontDrag:foilDrag;if(!drag||drag.pointerId!==e.pointerId)return;profilePending={svg,kind,pointerId:e.pointerId,x:e.clientX,y:e.clientY};if(profileFrame)return;profileFrame=requestAnimationFrame(()=>{profileFrame=0;const job=profilePending;if(!job)return;const {svg,kind,pointerId,x,y}=job,drag=kind==="front"?frontDrag:foilDrag;if(!drag||drag.pointerId!==pointerId)return;const pt=svg.createSVGPoint();pt.x=x;pt.y=y;const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=kind==="front"?frontMap():(svg.id==="top-view"?topFoilMap():foilMap()),p=map.toModel([local.x,local.y]),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[drag.seg],cp=drag.cp;drag.moved=true;if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.5,p[0]));p[1]=Math.max(0,Math.min(state.height*1.2,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}const dx=p[0]-seg[cp][0],dy=p[1]-seg[cp][1];seg[cp]=p;if(cp===0){seg[1]=[seg[1][0]+dx,seg[1][1]+dy];if(drag.seg>0){segs[drag.seg-1][3]=p;segs[drag.seg-1][2]=[segs[drag.seg-1][2][0]+dx,segs[drag.seg-1][2][1]+dy];}}if(cp===3){seg[2]=[seg[2][0]+dx,seg[2][1]+dy];if(drag.seg<segs.length-1){segs[drag.seg+1][0]=p;segs[drag.seg+1][1]=[segs[drag.seg+1][1][0]+dx,segs[drag.seg+1][1][1]+dy];}}if(kind==="front")syncProfileParameters("front");else syncProfileParameters("foil");updateTechnicalViews(true);updateFoil();});});
+  svg.addEventListener("pointermove",e=>{const kind=svg.id==="front-view"?"front":"foil",drag=kind==="front"?frontDrag:foilDrag;if(!drag||drag.pointerId!==e.pointerId)return;profilePending={svg,kind,pointerId:e.pointerId,x:e.clientX,y:e.clientY};if(profileFrame)return;profileFrame=requestAnimationFrame(()=>{profileFrame=0;const job=profilePending;if(!job)return;const {svg,kind,pointerId,x,y}=job,drag=kind==="front"?frontDrag:foilDrag;if(!drag||drag.pointerId!==pointerId)return;const pt=svg.createSVGPoint();pt.x=x;pt.y=y;const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=kind==="front"?frontMap():(svg.id==="top-view"?topFoilMap():foilMap()),p=map.toModel([local.x,local.y]),segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[drag.seg],cp=drag.cp;drag.moved=true;if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.5,p[0]));p[1]=Math.max(0,Math.min(state.height*1.2,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}const dx=p[0]-seg[cp][0],dy=p[1]-seg[cp][1];seg[cp]=p;if(cp===0){seg[1]=[seg[1][0]+dx,seg[1][1]+dy];if(drag.seg>0){segs[drag.seg-1][3]=p;segs[drag.seg-1][2]=[segs[drag.seg-1][2][0]+dx,segs[drag.seg-1][2][1]+dy];}}if(cp===3){seg[2]=[seg[2][0]+dx,seg[2][1]+dy];if(drag.seg<segs.length-1){segs[drag.seg+1][0]=p;segs[drag.seg+1][1]=[segs[drag.seg+1][1][0]+dx,segs[drag.seg+1][1][1]+dy];}}if(kind==="front")syncProfileParameters("front");else{enforceFoilMonotonicity();syncProfileParameters("foil");}updateTechnicalViews(true);updateFoil();});});
   const choose=e=>{const h=e.target.closest?.(".handle-hit[data-kind][data-seg][data-cp]");if(!h)return;const kind=h.dataset.kind,seg=Number(h.dataset.seg),cp=Number(h.dataset.cp);selectEditorPoint(kind,seg,cp,svg.id);focusProfileHandle(kind,seg,cp,svg.id);};
   svg.addEventListener("click",choose);
   const end=e=>{if(frontDrag?.pointerId===e.pointerId){const moved=frontDrag.moved;frontDrag=null;if(moved)update();}if(foilDrag?.pointerId===e.pointerId){const moved=foilDrag.moved;foilDrag=null;if(moved)update();}};svg.addEventListener("pointerup",end);svg.addEventListener("pointercancel",end);
@@ -417,7 +426,7 @@ function bindPointKeyboard(){
    const ox=p[0]-seg[cp][0],oy=p[1]-seg[cp][1];seg[cp]=p;
    if(cp===0){seg[1]=[seg[1][0]+ox,seg[1][1]+oy];if(si>0){segs[si-1][3]=p;segs[si-1][2]=[segs[si-1][2][0]+ox,segs[si-1][2][1]+oy];}}
    if(cp===3){seg[2]=[seg[2][0]+ox,seg[2][1]+oy];if(si<segs.length-1){segs[si+1][0]=p;segs[si+1][1]=[segs[si+1][1][0]+ox,segs[si+1][1][1]+oy];}}
-   if(kind==="front")syncProfileParameters("front");else syncProfileParameters("foil");selectEditorPoint(kind,si,cp,svgId);update({interactive:true});saveDesign();focusProfileHandle(kind,si,cp,svgId);return;
+   if(kind==="front")syncProfileParameters("front");else{enforceFoilMonotonicity();syncProfileParameters("foil");}selectEditorPoint(kind,si,cp,svgId);update({interactive:true});saveDesign();focusProfileHandle(kind,si,cp,svgId);return;
   }
   if(selectedPoint){e.preventDefault();e.stopPropagation();const step=e.altKey?.5:e.shiftKey?10:2.5,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);}
  },true);
