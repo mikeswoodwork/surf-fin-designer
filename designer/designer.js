@@ -461,7 +461,7 @@ function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){cons
 function pathFor(points,width,height,pad=12){const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),sx=(width-2*pad)/Math.max(1,maxX-minX),sy=(height-2*pad)/Math.max(1,maxY-minY),scale=Math.min(sx,sy),ox=(width-(maxX-minX)*scale)/2,oy=(height-(maxY-minY)*scale)/2;return points.map((p,i)=>(i?"L":"M")+(ox+(p[0]-minX)*scale).toFixed(2)+","+(height-oy-(p[1]-minY)*scale).toFixed(2)).join(" ")+" Z";}
 function frontMap(){const scale=140/Math.max(1,state.height),ox=160,baseY=155;return {toSvg:p=>[ox+p[0]*scale,baseY-p[1]*scale],toModel:p=>[(p[0]-ox)/scale,(baseY-p[1])/scale]};}
 function foilMap(){return {toSvg:p=>[15+p[0]*290,55-p[1]*34],toModel:p=>[(p[0]-15)/290,(55-p[1])/34]};}
-function topFoilMap(){const scaleY=34*(state.thickness/8);return {toSvg:p=>[15+p[0]*290,85-p[1]*scaleY],toModel:p=>[(p[0]-15)/290,(85-p[1])/scaleY]};}
+function topFoilMap(){const scale=290/Math.max(1,state.base),scaleY=scale*(state.thickness*.5);return {toSvg:p=>[15+p[0]*290,85-p[1]*scaleY],toModel:p=>[(p[0]-15)/290,(85-p[1])/scaleY]};}
 function renderBezierHandles(svgId,groupId,tangentId,segs,map,selection,kind){
  const g=$(groupId),tg=$(tangentId);if(!g||!tg)return;
  const ns="http://www.w3.org/2000/svg",make=(tag,attrs)=>{const el=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));return el;};
