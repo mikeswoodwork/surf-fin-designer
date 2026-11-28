@@ -249,34 +249,19 @@ const sourceSplines={
 };
 function defaultOutline(){
  const s=sourceSplines[state.template]||sourceSplines.fin37;
- return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base,lead:[],trail:[]};
+ return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base,sweep:0,lead:[],trail:[]};
 }
 function bezierPoint(seg,t){
  const u=1-t,a=seg[0],b=seg[1],c=seg[2],d=seg[3];
  return [u*u*u*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t*t*t*d[0],
          u*u*u*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1]];
 }
-function splineIntersections(y){
- const shape=getOutlinePoints(),segs=shape.segments,hits=[]; y*=shape.height/state.height;
- for(const seg of segs){
-  let t0=0,p0=bezierPoint(seg,0);
-  for(let k=1;k<=240;k++){
-   const t1=k/240,p1=bezierPoint(seg,t1),d0=p0[1]-y,d1=p1[1]-y;
-   if(Math.abs(d0)<1e-9)hits.push(p0[0]);
-   if(d0*d1<0){
-    let lo=t0,hi=t1,sign=d0<0;
-    for(let j=0;j<42;j++){
-     const mid=(lo+hi)/2,ym=bezierPoint(seg,mid)[1];
-     if((ym<y)===sign)lo=mid;else hi=mid;
-    }
-    hits.push(bezierPoint(seg,(lo+hi)/2)[0]);
-   }
-   p0=p1;t0=t1;
-  }
-  if(Math.abs(p0[1]-y)<1e-9)hits.push(p0[0]);
- }
+function bezierHitsAt(segs,y){
+ const hits=[];for(const seg of segs){let t0=0,p0=bezierPoint(seg,0);for(let k=1;k<=240;k++){const t1=k/240,p1=bezierPoint(seg,t1),d0=p0[1]-y,d1=p1[1]-y;if(Math.abs(d0)<1e-9)hits.push(p0[0]);if(d0*d1<0){let lo=t0,hi=t1,sign=d0<0;for(let j=0;j<42;j++){const mid=(lo+hi)/2,ym=bezierPoint(seg,mid)[1];if((ym<y)===sign)lo=mid;else hi=mid;}hits.push(bezierPoint(seg,(lo+hi)/2)[0]);}p0=p1;t0=t1;}if(Math.abs(p0[1]-y)<1e-9)hits.push(p0[0]);}
  return hits.sort((a,b)=>a-b).filter((v,i,arr)=>i===0||Math.abs(v-arr[i-1])>1e-5);
 }
+function rawSplineIntersections(y){return bezierHitsAt(getOutlinePoints().segments||[],y);}
+function splineIntersections(y){const shape=getOutlinePoints();return bezierHitsAt(shape.segments||[],y*shape.height/state.height);}
 function getOutlinePoints(){if(!outlinePoints)outlinePoints=defaultOutline();return outlinePoints;}
 function outlineAt(v){
  const p=getOutlinePoints(),t=Math.max(0,Math.min(1,v)),y=t*state.height;
@@ -285,28 +270,29 @@ function outlineAt(v){
   const rootWidth=Math.max(1e-6,p.base||(p.trail[0][0]-p.lead[0][0])),scale=state.base/rootWidth,offset=state.sweep*t,rootX=p.lead[0][0];return [(sample(p.lead)-rootX)*scale+rootX+offset,(sample(p.trail)-rootX)*scale+rootX+offset];
  }
  const hits=splineIntersections(y);if(hits.length===0)return [0,0];
- const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/s.base;
- if(hits.length===1){const x=hits[0]*scale+sweepOffset(y,s);return [x,x];}
+ const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/(p.base||s.base);
+ if(hits.length===1){const x=hits[0]*scale+(state.sweep-(p.sweep||0)*scale)*t;return [x,x];}
  const left=hits[0]*scale,right=hits[hits.length-1]*scale;
- const tipCorrection=(state.tip-sourceTipWidth)*t*.5,shift=state.sweep*(y/s.height);
+ const tipCorrection=(state.tip-sourceTipWidth)*t*.5,shift=(state.sweep-(p.sweep||0)*scale)*t;
  return [left+shift-tipCorrection,right+shift+tipCorrection];
 }
 function sweepOffset(y,s){return state.sweep*(y/s.height);}
 function pointSlope(points,k){return 0;}
 function edgeX(points,y){return 0;}
 function outline(){const p=[],n=2500;for(let i=0;i<=n;i++){const v=i/n;p.push([outlineAt(v)[0],state.height*v]);}for(let i=n;i>=0;i--){const v=i/n;p.push([outlineAt(v)[1],state.height*v]);}return p;}
+function outlineSideSign(p){const hits=rawSplineIntersections(p[1]);if(hits.length<2)return p[0]>=0?1:-1;return p[0]>=(hits[0]+hits[hits.length-1])/2?1:-1;}
+function outlineDisplayPoint(p,sign=outlineSideSign(p)){const shape=getOutlinePoints(),src=sourceSplines[state.template]||sourceSplines.fin37,sc=state.base/(shape.base||src.base),ys=state.height/(shape.height||src.height),t=p[1]/(shape.height||src.height),tip=(state.tip-sourceTipWidth)*t*.5,shift=(state.sweep-(shape.sweep||0)*sc)*t;return [p[0]*sc+shift+sign*tip,p[1]*ys];}
 function outlineViewMap(){
- const segs=getOutlinePoints().segments,pts=[];
- segs.forEach(seg=>{for(let i=0;i<=80;i++)pts.push(bezierPoint(seg,i/80));});
+ const segs=getOutlinePoints().segments,pts=[];segs.forEach(seg=>{for(let i=0;i<=80;i++){const p=bezierPoint(seg,i/80);pts.push(outlineDisplayPoint(p));}});
  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(0,...ys),maxY=Math.max(state.height,...ys);
- const scale=Math.min(290/Math.max(1,maxX-minX),330/Math.max(1,maxY-minY));
- const ox=(320-(maxX-minX)*scale)/2,oy=(360-(maxY-minY)*scale)/2;
- return {scale,minX,minY,ox,oy,toSvg:([x,y])=>[ox+(x-minX)*scale,360-oy-(y-minY)*scale],toModel:([x,y])=>[(x-ox)/scale+minX,(360-y-oy)/scale+minY]};
+ const scale=Math.min(290/Math.max(1,maxX-minX),330/Math.max(1,maxY-minY)),ox=(320-(maxX-minX)*scale)/2,oy=(360-(maxY-minY)*scale)/2;
+ const toScreen=([x,y])=>[ox+(x-minX)*scale,360-oy-(y-minY)*scale];
+ return {scale,minX,minY,ox,oy,toSvg:(p,si,cp)=>toScreen(outlineDisplayPoint(p)),toModel:([x,y],si,cp)=>{const shown=[(x-ox)/scale+minX,(360-y-oy)/scale+minY],shape=getOutlinePoints(),src=sourceSplines[state.template]||sourceSplines.fin37,raw=shape.segments[si][cp],sign=outlineSideSign(raw),sc=state.base/(shape.base||src.base),t=shown[1]/state.height,tip=(state.tip-sourceTipWidth)*t*.5,shift=(state.sweep-(shape.sweep||0)*sc)*t;return [(shown[0]-shift-sign*tip)/sc,shown[1]*(shape.height||src.height)/state.height];}};
 }
 function bezierOutlinePath(map){
  const segs=getOutlinePoints().segments;if(!segs?.length)return "";
- const p=map.toSvg(segs[0][0]);let d="M"+p[0].toFixed(2)+","+p[1].toFixed(2);
- for(const seg of segs){const q=seg.slice(1).map(map.toSvg);d+=" C"+q.map(v=>v[0].toFixed(2)+","+v[1].toFixed(2)).join(" ");}
+ const fmt=p=>p[0].toFixed(2)+","+p[1].toFixed(2),first=map.toSvg(segs[0][0],0,0);let d="M"+fmt(first);
+ for(let si=0;si<segs.length;si++){const seg=segs[si],q=seg.slice(1).map((p,i)=>map.toSvg(p,si,i+1));d+=" C"+q.map(fmt).join(" ");}
  return d+" Z";
 }
 function bezierAnchor(segIndex,cpIndex){
@@ -331,13 +317,13 @@ function drawOutlineHandles(refreshFields=true){
  if(!Array.isArray(segs)){group.replaceChildren();tg.replaceChildren();selectedPoint=null;updateTangentFields();return;}
  segs.forEach((seg,si)=>{
   [[0,1],[3,2]].forEach(([anchorIndex,handleIndex])=>{
-   const a=map.toSvg(seg[anchorIndex]),h=map.toSvg(seg[handleIndex]);
+   const a=map.toSvg(seg[anchorIndex],si,anchorIndex),h=map.toSvg(seg[handleIndex],si,handleIndex);
    lines.push('<line class="tangent-line" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+h[0]+'" y2="'+h[1]+'"/>');
   });
   seg.forEach((p,pi)=>{
    // A shared join is drawn once, using the preceding segment's end.
    if(pi===0&&si>0)return;
-   const [x,y]=map.toSvg(p),active=selectedPoint?.seg===si&&selectedPoint?.cp===pi;
+   const [x,y]=map.toSvg(p,si,pi),active=selectedPoint?.seg===si&&selectedPoint?.cp===pi;
    const anchor=pi===0||pi===3;
    const hit='<circle class="handle-hit" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="14" tabindex="0" role="button" aria-label="'+(anchor?"Ankerpunkt":"Tangentenpunkt")+(si+1)+'"/>';(anchor?anchorHits:tangentHits).push(hit);
    els.push('<circle class="'+(anchor?'outline-handle':'tangent-handle')+(active?' selected':'')+'" data-seg="'+si+'" data-cp="'+pi+'" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+(anchor?(active?7:5):(active?6:4))+'" tabindex="0" role="button" aria-label="'+(anchor?"Ankerpunkt":"Tangentenpunkt")+' '+(si+1)+'"/>');
@@ -394,11 +380,15 @@ function bindProfileEditors(){
  });
 }
 
+function syncOutlineParametersAfterEdit(){
+ const shape=getOutlinePoints(),segs=shape.segments;if(!segs?.length)return;const src=sourceSplines[state.template]||sourceSplines.fin37,oldScale=state.base/(shape.base||src.base),oldHeightScale=state.height/(shape.height||src.height),rawBase=Math.max(.1,Math.abs(segs[0][0][0]-segs[segs.length-1][3][0])),rawHeight=Math.max(1,splineExtent(segs,1).max),tipHits=bezierHitsAt(segs,rawHeight-1e-5),rawTip=tipHits.length>1?tipHits[tipHits.length-1]-tipHits[0]:0,midHits=bezierHitsAt(segs,rawHeight*.5),srcMid=bezierHitsAt(src.segments,src.height*.5),rawSweep=midHits.length>1&&srcMid.length>1?(midHits[0]+midHits[midHits.length-1])/2-(srcMid[0]+srcMid[srcMid.length-1])/2*(shape.base||src.base)/src.base:(shape.sweep||0);
+ const sweepDelta=rawSweep-(shape.sweep||0);shape.base=rawBase;state.base=rawBase*oldScale;shape.height=rawHeight;state.height=rawHeight*oldHeightScale;shape.sweep=rawSweep;state.sweep+=sweepDelta*oldScale;state.tip=rawTip*oldScale;sourceTipWidth=state.tip;syncInputs();[...definitions,...foilDefs].forEach(([id])=>{if($(id+"-out"))$(id+"-out").textContent=Number(state[id]??0)+(id==="cant"?"°":" mm");});
+}
 function nudgeOutlinePoint(segIndex,cp,dx,dy){
  const segs=getOutlinePoints().segments,seg=segs[segIndex];if(!seg)return;
  const p=[seg[cp][0]+dx,seg[cp][1]+dy];
  if(cp===0||cp===3){p[1]=Math.max(0,Math.min(state.height,p[1]));syncBezierJoin(segIndex,cp,p);}else seg[cp]=p;
- selectEditorPoint("outline",segIndex,cp);update({interactive:true});saveDesign();requestAnimationFrame(()=>{const h=document.querySelector("#outline-handles .handle-hit[data-seg=\""+segIndex+"\" ][data-cp=\""+cp+"\"]");h?.focus({preventScroll:true});});
+ selectEditorPoint("outline",segIndex,cp);syncOutlineParametersAfterEdit();update({interactive:true});saveDesign();requestAnimationFrame(()=>{const h=document.querySelector("#outline-handles .handle-hit[data-seg=\""+segIndex+"\" ][data-cp=\""+cp+"\"]");h?.focus({preventScroll:true});});
 }
 function bindPointKeyboard(){
  const focusRange=e=>{const range=e.target?.closest?.('input[type="range"]');if(range)requestAnimationFrame(()=>range.focus({preventScroll:true}));};
@@ -435,7 +425,7 @@ let outlineFrame=0,outlinePending=null;
 function bindOutlineEditor(){
  const svg=$("side-view");
  svg.addEventListener("pointerdown",e=>{const handle=e.target.closest("[data-seg][data-cp]");if(!handle)return;e.preventDefault();dragPoint={seg:Number(handle.dataset.seg),cp:Number(handle.dataset.cp),pointerId:e.pointerId};selectEditorPoint("outline",dragPoint.seg,dragPoint.cp);svg.setPointerCapture(e.pointerId);requestAnimationFrame(()=>{const h=document.querySelector("#outline-handles .handle-hit[data-seg='"+selectedPoint.seg+"'][data-cp='"+selectedPoint.cp+"']");h?.focus({preventScroll:true});});});
- svg.addEventListener("pointermove",e=>{if(!dragPoint||dragPoint.pointerId!==e.pointerId)return;outlinePending={x:e.clientX,y:e.clientY,pointerId:e.pointerId};if(outlineFrame)return;outlineFrame=requestAnimationFrame(()=>{outlineFrame=0;const job=outlinePending;if(!job||!dragPoint||dragPoint.pointerId!==job.pointerId)return;const pt=svg.createSVGPoint();pt.x=job.x;pt.y=job.y;const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=outlineViewMap(),p=map.toModel([local.x,local.y]),seg=getOutlinePoints().segments[dragPoint.seg],cp=dragPoint.cp;if(cp===0||cp===3){p[1]=Math.max(0,Math.min(state.height,p[1]));syncBezierJoin(dragPoint.seg,cp,p);}else seg[cp]=p;$("side-view-path").setAttribute("d",bezierOutlinePath(map));drawOutlineHandles(false);});});
+ svg.addEventListener("pointermove",e=>{if(!dragPoint||dragPoint.pointerId!==e.pointerId)return;outlinePending={x:e.clientX,y:e.clientY,pointerId:e.pointerId};if(outlineFrame)return;outlineFrame=requestAnimationFrame(()=>{outlineFrame=0;const job=outlinePending;if(!job||!dragPoint||dragPoint.pointerId!==job.pointerId)return;const pt=svg.createSVGPoint();pt.x=job.x;pt.y=job.y;const local=pt.matrixTransform(svg.getScreenCTM().inverse()),map=outlineViewMap(),p=map.toModel([local.x,local.y],dragPoint.seg,dragPoint.cp),seg=getOutlinePoints().segments[dragPoint.seg],cp=dragPoint.cp;if(cp===0||cp===3){p[1]=Math.max(0,Math.min(state.height*1.2,p[1]));syncBezierJoin(dragPoint.seg,cp,p);}else seg[cp]=p;syncOutlineParametersAfterEdit();$("side-view-path").setAttribute("d",bezierOutlinePath(map));drawOutlineHandles(false);});});
  const finish=e=>{if(dragPoint&&dragPoint.pointerId===e.pointerId){dragPoint=null;update();}};svg.addEventListener("pointerup",finish);svg.addEventListener("pointercancel",finish);svg.addEventListener("lostpointercapture",()=>{dragPoint=null;});
  svg.addEventListener("click",e=>{const h=e.target.closest("[data-seg][data-cp]");if(!h)return;selectEditorPoint("outline",h.dataset.seg,h.dataset.cp);requestAnimationFrame(()=>{const n=document.querySelector("#outline-handles .handle-hit[data-seg='"+selectedPoint.seg+"'][data-cp='"+selectedPoint.cp+"']");n?.focus({preventScroll:true});});});
 }
@@ -489,7 +479,7 @@ function renderBezierHandles(svgId,groupId,tangentId,segs,map,selection,kind){
 }
 function updateTechnicalViews(interactive=false){const map=outlineViewMap();$("side-view-path").setAttribute("d",bezierOutlinePath(map));drawOutlineHandles(!interactive);const tm=topFoilMap(),fmt=p=>{const q=tm.toSvg(p);return q[0].toFixed(2)+","+q[1].toFixed(2);};let topPath="M"+fmt(foilSpline[0][0]);for(const seg of foilSpline)topPath+=" C"+fmt(seg[1])+" "+fmt(seg[2])+" "+fmt(seg[3]);for(let si=foilSpline.length-1;si>=0;si--){const seg=foilSpline[si];topPath+=" C"+fmt([seg[2][0],-seg[2][1]])+" "+fmt([seg[1][0],-seg[1][1]])+" "+fmt([seg[0][0],-seg[0][1]]);}topPath+=" Z";$("top-view-path").setAttribute("d",topPath);const front=[];for(let i=0;i<=80;i++){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.top,z]);}for(let i=80;i>=0;i--){const v=i/80,z=state.height*v,f=profile(.38,frontThicknessAt(v));front.push([f.bottom,z]);}const fm=frontMap();$("front-view-path").setAttribute("d",front.map((p,i)=>{const q=fm.toSvg(p);return (i?"L":"M")+q[0].toFixed(2)+","+q[1].toFixed(2);}).join(" ")+" Z");renderBezierHandles("front-view","front-handles","front-tangents",getFrontSpline(),frontMap(),frontSelection,"front");renderBezierHandles("foil-svg","foil-handles","foil-tangents",foilSpline,foilMap(),foilSelection,"foil");renderBezierHandles("top-view","top-foil-handles","top-foil-tangents",foilSpline,topFoilMap(),foilSelection,"foil");}
 function updateFoil(){const pts=[],half=Math.max(.001,state.thickness*.5);for(let i=0;i<=100;i++){const f=profile(i/100,state.thickness);pts.push([15+i/100*290,55-f.top/half*34]);}for(let i=100;i>=0;i--){const f=profile(i/100,state.thickness);pts.push([15+i/100*290,55-f.bottom/half*34]);}$("foil-path").setAttribute("d",pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ")+"Z");}
-function update(options={}){const interactive=!!options.interactive;syncInputs();if(!outlinePoints?.lead){const tipHits=splineIntersections(state.height-1e-5);sourceTipWidth=tipHits.length>1?(tipHits[tipHits.length-1]-tipHits[0])*(state.base/(sourceSplines[state.template]||sourceSplines.fin37).base):0;}else sourceTipWidth=0;[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("base-position").value=state.basePosition??50;if($("base-position-value"))$("base-position-value").value=state.basePosition??50;$("base-position-out").textContent=(state.basePosition??50)+"%";$("base-lateral").value=state.baseLateral??0;if($("base-lateral-value"))$("base-lateral-value").value=state.baseLateral??0;$("base-lateral-out").textContent=(state.baseLateral??0).toFixed(1)+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin(interactive);if(!interactive){metrics();saveDesign();}updateFoil();updateTechnicalViews(interactive);}
+function update(options={}){const interactive=!!options.interactive;syncInputs();if(!outlinePoints?.lead){const tipHits=splineIntersections(state.height-1e-5);sourceTipWidth=tipHits.length>1?(tipHits[tipHits.length-1]-tipHits[0])*(state.base/(getOutlinePoints().base||(sourceSplines[state.template]||sourceSplines.fin37).base)):0;}else sourceTipWidth=0;[...definitions,...foilDefs].forEach(([id,label])=>{if($(id+"-out"))$(id+"-out").textContent=(state[id]??0)+(id==="cant"?"°":id==="concavity"?" mm":" mm");});$("read-height").textContent=state.height+" mm";$("read-base").textContent=state.base+" mm";$("read-tip").textContent=state.tip+" mm";$("read-thick").textContent=state.thickness+" mm";$("base-position").value=state.basePosition??50;if($("base-position-value"))$("base-position-value").value=state.basePosition??50;$("base-position-out").textContent=(state.basePosition??50)+"%";$("base-lateral").value=state.baseLateral??0;if($("base-lateral-value"))$("base-lateral-value").value=state.baseLateral??0;$("base-lateral-out").textContent=(state.baseLateral??0).toFixed(1)+" mm";$("model-label").textContent=$("setup").selectedOptions[0].text+" · "+(state.finType==="center"?"Centerfin":"Sidefin");makeFin(interactive);if(!interactive){metrics();saveDesign();}updateFoil();updateTechnicalViews(interactive);}
 function setView(mode){viewMode=mode;document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===mode));if(mode==="3d"){camera.position.set(220,170,260);controls.enableRotate=true;}else if(mode==="side"){camera.position.set(0,0,420);controls.enableRotate=false;}else{camera.position.set(420,0,0);controls.enableRotate=false;}controls.target.set(0,0,0);controls.update();}
 document.querySelectorAll(".view-btn").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 function download(name,blob){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
