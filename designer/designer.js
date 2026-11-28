@@ -390,10 +390,9 @@ function bindPointKeyboard(){
   if(["input","textarea","select"].includes(tag)||e.target?.isContentEditable)return;
   const focused=e.target?.matches?.(".handle-hit[data-kind][data-seg][data-cp]")?e.target:null;
   const active=focused?{kind:focused.dataset.kind,seg:Number(focused.dataset.seg),cp:Number(focused.dataset.cp)}:activeEditorPoint;
-  if(!active||!["front","foil"].includes(active.kind))return;
-  const isTangent=active.cp===1||active.cp===2,baseStep=isTangent?25:2.5,step=e.altKey?baseStep*.2:e.shiftKey?baseStep*4:baseStep,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
-  e.preventDefault();e.stopPropagation();
-  {
+  if(active&&["front","foil"].includes(active.kind)){
+   const isTangent=active.cp===1||active.cp===2,baseStep=isTangent?25:2.5,step=e.altKey?baseStep*.2:e.shiftKey?baseStep*4:baseStep,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;
+   e.preventDefault();e.stopPropagation();
    const kind=active.kind,si=active.seg,cp=active.cp,segs=kind==="front"?getFrontSpline():foilSpline,seg=segs[si];if(!seg)return;
    const scale=kind==="foil"?.1:1,px=dx*scale,py=dy*scale;const p=[seg[cp][0]+px,seg[cp][1]+py];
    if(kind==="front"){p[0]=Math.max(0,Math.min(state.thickness*1.2,p[0]));p[1]=Math.max(0,Math.min(state.height,p[1]));}else{p[0]=Math.max(0,Math.min(1,p[0]));p[1]=Math.max(0,Math.min(1.25,p[1]));}
@@ -402,7 +401,7 @@ function bindPointKeyboard(){
    if(cp===3){seg[2]=[seg[2][0]+ox,seg[2][1]+oy];if(si<segs.length-1){segs[si+1][0]=p;segs[si+1][1]=[segs[si+1][1][0]+ox,segs[si+1][1][1]+oy];}}
    selectEditorPoint(kind,si,cp,active.svgId||focused?.closest("svg")?.id);const svgId=active.svgId||focused?.closest("svg")?.id;update({interactive:true});saveDesign();focusProfileHandle(kind,si,cp,svgId);return;
   }
-  if(selectedPoint){nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);e.preventDefault();}
+  if(selectedPoint){e.preventDefault();e.stopPropagation();const step=e.altKey?.5:e.shiftKey?10:2.5,dx=e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,dy=e.key==="ArrowDown"?-step:e.key==="ArrowUp"?step:0;nudgeOutlinePoint(selectedPoint.seg,selectedPoint.cp,dx,dy);}
  },true);
 }
 let outlineFrame=0,outlinePending=null;
