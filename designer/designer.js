@@ -271,7 +271,7 @@ function outlineAt(v){
  }
  const hits=splineIntersections(y);if(hits.length===0)return [0,0];
  const s=sourceSplines[state.template]||sourceSplines.fin37,scale=state.base/(p.base||s.base);
- if(hits.length===1){const x=hits[0]*scale+(state.sweep-(p.sweep||0)*scale)*t;return [x,x];}
+ if(hits.length===1){const x=hits[0]*scale,tipCorrection=(state.tip-sourceTipWidth)*t*.5,shift=(state.sweep-(p.sweep||0)*scale)*t;return [x+shift-tipCorrection,x+shift+tipCorrection];}
  const left=hits[0]*scale,right=hits[hits.length-1]*scale;
  const tipCorrection=(state.tip-sourceTipWidth)*t*.5,shift=(state.sweep-(p.sweep||0)*scale)*t;
  return [left+shift-tipCorrection,right+shift+tipCorrection];
