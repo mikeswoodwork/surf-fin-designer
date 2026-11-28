@@ -249,7 +249,7 @@ const sourceSplines={
 };
 function defaultOutline(){
  const s=sourceSplines[state.template]||sourceSplines.fin37;
- return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base,sweep:0,lead:[],trail:[]};
+ const tipHits=bezierHitsAt(s.segments,s.height-1e-5),tip=tipHits.length>1?tipHits[tipHits.length-1]-tipHits[0]:0;return {segments:s.segments.map(seg=>seg.map(p=>[...p])),height:s.height,base:s.base,tip,sweep:0,lead:[],trail:[]};
 }
 function bezierPoint(seg,t){
  const u=1-t,a=seg[0],b=seg[1],c=seg[2],d=seg[3];
@@ -382,7 +382,7 @@ function bindProfileEditors(){
 
 function syncOutlineParametersAfterEdit(){
  const shape=getOutlinePoints(),segs=shape.segments;if(!segs?.length)return;const src=sourceSplines[state.template]||sourceSplines.fin37,oldScale=state.base/(shape.base||src.base),oldHeightScale=state.height/(shape.height||src.height),rawBase=Math.max(.1,Math.abs(segs[0][0][0]-segs[segs.length-1][3][0])),rawHeight=Math.max(1,splineExtent(segs,1).max),tipHits=bezierHitsAt(segs,rawHeight-1e-5),rawTip=tipHits.length>1?tipHits[tipHits.length-1]-tipHits[0]:0,midHits=bezierHitsAt(segs,rawHeight*.5),srcMid=bezierHitsAt(src.segments,src.height*.5),rawSweep=midHits.length>1&&srcMid.length>1?(midHits[0]+midHits[midHits.length-1])/2-(srcMid[0]+srcMid[srcMid.length-1])/2*(shape.base||src.base)/src.base:(shape.sweep||0);
- const sweepDelta=rawSweep-(shape.sweep||0);shape.base=rawBase;state.base=rawBase*oldScale;shape.height=rawHeight;state.height=rawHeight*oldHeightScale;shape.sweep=rawSweep;state.sweep+=sweepDelta*oldScale;state.tip=rawTip*oldScale;sourceTipWidth=state.tip;syncInputs();[...definitions,...foilDefs].forEach(([id])=>{if($(id+"-out"))$(id+"-out").textContent=Number(state[id]??0)+(id==="cant"?"°":" mm");});
+ const sweepDelta=rawSweep-(shape.sweep||0),tipDelta=rawTip-(shape.tip??rawTip);shape.base=rawBase;state.base=rawBase*oldScale;shape.height=rawHeight;state.height=rawHeight*oldHeightScale;shape.sweep=rawSweep;state.sweep+=sweepDelta*oldScale;shape.tip=rawTip;state.tip+=tipDelta*oldScale;sourceTipWidth=rawTip*oldScale;syncInputs();[...definitions,...foilDefs].forEach(([id])=>{if($(id+"-out"))$(id+"-out").textContent=Number(state[id]??0)+(id==="cant"?"°":" mm");});
 }
 function nudgeOutlinePoint(segIndex,cp,dx,dy){
  const segs=getOutlinePoints().segments,seg=segs[segIndex];if(!seg)return;
