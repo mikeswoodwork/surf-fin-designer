@@ -45,3 +45,7 @@
 
 /* Clear keyboard and pointer selection states for all editable Bézier handles */
 .handle-hit:focus{outline:none;stroke:#fff;stroke-width:2.5;stroke-dasharray:3 2;filter:drop-shadow(0 0 3px #e8a45e)}.outline-handle.selected{fill:#ff9f43;stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 3px #ff9f43)}.tangent-handle.selected{fill:#fff;stroke:#ff9f43;stroke-width:3;filter:drop-shadow(0 0 3px #ff9f43)}.handle-hit{cursor:grab;touch-action:none}
+
+/* Keyboard focus for range controls */
+.range-input-row input[type=range]{cursor:pointer;touch-action:pan-y;accent-color:var(--accent);min-height:24px;}
+.range-input-row input[type=range]:focus-visible{outline:2px solid #ff9f43;outline-offset:4px;border-radius:6px;}
