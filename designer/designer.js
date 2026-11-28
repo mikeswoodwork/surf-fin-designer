@@ -41,7 +41,7 @@ function applyControlValue(id,value){
  const [,label,min,max]=def;let next=Number(value);if(!Number.isFinite(next))return;next=Math.max(min,Math.min(max,next));
  const old=Number(state[id]??0);if(next===old)return;
  if(id==="height"){const scale=next/old;if(outlinePoints){if(outlinePoints.segments)outlinePoints.segments.forEach(seg=>seg.forEach(p=>p[1]*=scale));for(const edge of ["lead","trail"])outlinePoints[edge]?.forEach(p=>{p[1]*=scale;if(Number.isFinite(p.m))p.m/=scale;});outlinePoints.height=next;}if(frontSpline)frontSpline.forEach(seg=>seg.forEach(p=>p[1]*=scale));}
- if(id==="thickness"&&frontSpline){const scale=next/old;frontSpline.forEach(seg=>seg.forEach(p=>p[0]*=scale));}
+ if(id==="thickness"){const front=getFrontSpline(),scale=next/old;front.forEach(seg=>seg.forEach(p=>p[0]*=scale));}
  state[id]=next;if($(id))$(id).value=String(next);if($(id+"-value")&&document.activeElement!==$(id+"-value"))$(id+"-value").value=String(next);
  if($(id+"-out"))$(id+"-out").textContent=next+(id==="cant"?"°":" mm");
  if(!controlFrame)controlFrame=requestAnimationFrame(()=>{controlFrame=0;update({interactive:true});});
@@ -458,9 +458,9 @@ async function importOutline(file){
 }
 function metrics(){const p=outline();let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}area=Math.abs(area/2);$("read-area").textContent=Math.round(area)+" mm²";$("read-volume").textContent=Math.round(area*state.thickness*.52)+" mm³";}
 function pathFor(points,width,height,pad=12){const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),sx=(width-2*pad)/Math.max(1,maxX-minX),sy=(height-2*pad)/Math.max(1,maxY-minY),scale=Math.min(sx,sy),ox=(width-(maxX-minX)*scale)/2,oy=(height-(maxY-minY)*scale)/2;return points.map((p,i)=>(i?"L":"M")+(ox+(p[0]-minX)*scale).toFixed(2)+","+(height-oy-(p[1]-minY)*scale).toFixed(2)).join(" ")+" Z";}
-function frontMap(){const scaleX=130/Math.max(1,state.thickness*1.2),scaleY=140/state.height,ox=160,baseY=155;return {toSvg:p=>[ox+p[0]*scaleX,baseY-p[1]*scaleY],toModel:p=>[(p[0]-ox)/scaleX,(baseY-p[1])/scaleY]};}
+function frontMap(){const scaleX=130/(18*1.2),scaleY=140/state.height,ox=160,baseY=155;return {toSvg:p=>[ox+p[0]*scaleX,baseY-p[1]*scaleY],toModel:p=>[(p[0]-ox)/scaleX,(baseY-p[1])/scaleY]};}
 function foilMap(){return {toSvg:p=>[15+p[0]*290,55-p[1]*34],toModel:p=>[(p[0]-15)/290,(55-p[1])/34]};}
-function topFoilMap(){return {toSvg:p=>[15+p[0]*290,85-p[1]*34],toModel:p=>[(p[0]-15)/290,(85-p[1])/34]};}
+function topFoilMap(){const scaleY=34*(state.thickness/8);return {toSvg:p=>[15+p[0]*290,85-p[1]*scaleY],toModel:p=>[(p[0]-15)/290,(85-p[1])/scaleY]};}
 function renderBezierHandles(svgId,groupId,tangentId,segs,map,selection,kind){
  const g=$(groupId),tg=$(tangentId);if(!g||!tg)return;
  const ns="http://www.w3.org/2000/svg",make=(tag,attrs)=>{const el=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));return el;};
