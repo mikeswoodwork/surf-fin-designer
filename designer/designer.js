@@ -81,8 +81,8 @@ let foilSpline=[
 ];
 // Editable front-view thickness envelope. x is half-thickness in mm, y is span in mm.
 let frontSpline=null,frontSelection=null,frontDrag=null,foilSelection=null,foilDrag=null;
-function defaultFrontSpline(){const h=state.height,t=state.thickness;return [[[t,0],[t*.98,h*.28],[t*.72,h*.78],[0,h]]];}
-function getFrontSpline(){if(!frontSpline)frontSpline=defaultFrontSpline();return frontSpline;}
+function defaultFrontSpline(){const h=state.height,t=state.thickness,tipT=state.tip>0?Math.max(.8,t*.08):0;return [[[t,0],[t*.98,h*.28],[Math.max(t*.72,tipT*1.5),h*.78],[tipT,h]]];}
+function getFrontSpline(){if(!frontSpline)frontSpline=defaultFrontSpline();if(state.tip>0&&frontSpline.length){const last=frontSpline[frontSpline.length-1],minimumTipThickness=Math.max(.8,state.thickness*.08);if(last[3][0]<minimumTipThickness){last[3][0]=minimumTipThickness;last[2][0]=Math.max(last[2][0],minimumTipThickness*1.5);}}return frontSpline;}
 function splineExtent(segs,axis){
  let min=Infinity,max=-Infinity;
  for(const seg of segs)for(let i=0;i<=80;i++){const v=bezierValue(seg,i/80)[axis];min=Math.min(min,v);max=Math.max(max,v);}
